@@ -1,57 +1,129 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased min-h-screen selection:bg-purple-600 selection:text-white;
-  }
+/* Explicit content sources so utilities are always generated */
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
+
+@theme {
+  --font-display: "Instrument Serif", "Syne", Georgia, serif;
+  --font-heading: "Syne", "Instrument Serif", sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+  --font-hand: "Architects Daughter", "Comic Sans MS", cursive;
+  --color-paper: #fafafa;
+  --color-ink: #000000;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-full: 0;
 }
 
-/* Custom glowing effects and animations for Esports/Arena look */
-@keyframes pulseSlow {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.02); }
+:root {
+  color-scheme: light;
 }
 
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(1000%); }
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 
-.animate-pulse-slow {
-  animation: pulseSlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+html,
+body,
+#root {
+  height: 100%;
 }
 
-.glow-cyan {
-  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.45);
+body {
+  margin: 0;
+  background: #fafafa;
+  color: #000;
+  font-family: "Space Mono", ui-monospace, monospace;
+  -webkit-font-smoothing: antialiased;
 }
 
-.glow-purple {
-  box-shadow: 0 0 25px -5px rgba(168, 85, 247, 0.45);
+::selection {
+  background: #000;
+  color: #fff;
 }
 
-.glow-red {
-  box-shadow: 0 0 25px -5px rgba(239, 68, 68, 0.45);
+input,
+button,
+textarea {
+  font-family: inherit;
+  border-radius: 0;
 }
 
-.glow-green {
-  box-shadow: 0 0 25px -5px rgba(34, 197, 94, 0.45);
+input:focus,
+button:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: -3px;
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Grid helpers: 1.5px ink dividers */
+.b { border: 1.5px solid #000; }
+.bt { border-top: 1.5px solid #000; }
+.bb { border-bottom: 1.5px solid #000; }
+.bl { border-left: 1.5px solid #000; }
+.br { border-right: 1.5px solid #000; }
+
+.btn-ink {
+  background: #000;
+  color: #fff;
+  border: 1.5px solid #000;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.btn-ink:hover:not(:disabled) {
+  background: #fff;
+  color: #000;
+}
+.btn-ink:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.btn-paper {
+  background: #fafafa;
+  color: #000;
+  border: 1.5px solid #000;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-paper:hover:not(:disabled) {
+  background: #000;
+  color: #fff;
+}
+.btn-paper:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
-::-webkit-scrollbar-track {
-  background: #0f172a;
+/* Monochrome hatch / checker fills */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, #000 0 2px, #fafafa 2px 7px);
+}
+.checker {
+  background-color: #fafafa;
+  background-image:
+    linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%),
+    linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+@keyframes blink {
+  50% { opacity: 0; }
 }
+.blink { animation: blink 1s steps(1) infinite; }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+@keyframes wobble {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
 }
+.wobble { animation: wobble 1.4s ease-in-out infinite; }

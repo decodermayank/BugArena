@@ -1,5 +1,5 @@
 """
-FastAPI Backend for CodeDuel (Live 1v1 Debugging & Spectator Arena).
+FastAPI Backend for BugArena (Live 1v1 Debugging & Spectator Arena).
 Provides REST APIs for room creation & health, and native WebSockets for real-time match state synchronization.
 """
 
@@ -14,9 +14,9 @@ from pydantic import BaseModel
 from room_manager import RoomManager
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("codeduel")
+logger = logging.getLogger("BugArena")
 
-app = FastAPI(title="CodeDuel API", version="1.0.0")
+app = FastAPI(title="BugArena API", version="1.0.0")
 
 # Enable CORS for Vite frontend
 app.add_middleware(
@@ -39,7 +39,7 @@ class CreateRoomRequest(BaseModel):
 @app.get("/health")
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "CodeDuel Backend"}
+    return {"status": "ok", "service": "BugArena Backend"}
 
 
 @app.get("/api/problems")
@@ -82,7 +82,7 @@ async def websocket_endpoint(
     room_code: str,
     client_id: str,
     role: str = Query(default="spectator"),
-    name: str = Query(default="Challenger")
+    name: str = Query(default="")
 ):
     await websocket.accept()
     room_code_upper = room_code.upper()
@@ -157,10 +157,10 @@ async def websocket_endpoint(
 
     except WebSocketDisconnect:
         logger.info(f"Client {client_id} disconnected from {room_code_upper}")
-        await room_manager.disconnect(room_code_upper, client_id)
+        await room_manager.disconnect(room_code_upper, client_id, websocket)
     except Exception as e:
         logger.error(f"Error in websocket loop for {client_id}: {e}")
-        await room_manager.disconnect(room_code_upper, client_id)
+        await room_manager.disconnect(room_code_upper, client_id, websocket)
 
 
 if __name__ == "__main__":
