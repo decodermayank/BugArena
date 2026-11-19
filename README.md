@@ -23,18 +23,26 @@
 
 ## Quickstart & Local Execution
 
-### 1. Start the FastAPI Backend
+### 1. Clone the Repository
+```bash
+git clone https://github.com/decodermayank/BugArena.git
+cd BugArena
+```
+
+### 2. Start the FastAPI Backend
 Open a terminal in the project root:
 ```bash
 cd backend
+pip install -r requirements.txt
 python -m uvicorn main:app --reload --port 8000
 ```
 *Health check URL: `http://localhost:8000/api/health`*
 
-### 2. Start the Vite Frontend
+### 3. Start the Vite Frontend
 Open a second terminal in the project root:
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 *Frontend URL: `http://localhost:5173`*
