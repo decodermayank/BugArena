@@ -1,0 +1,113 @@
+[
+  {
+    "id": "two_sum",
+    "title": "Two Sum",
+    "description": "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`. Assume each input has exactly one solution.",
+    "function_name": "two_sum",
+    "clean_code": "def two_sum(nums, target):\n    lookup = {}\n    for i in range(len(nums)):\n        diff = target - nums[i]\n        if diff in lookup:\n            return [lookup[diff], i]\n        lookup[nums[i]] = i\n    return []",
+    "test_cases": [
+      {"name": "Standard pair", "code": "assert two_sum([2, 7, 11, 15], 9) == [0, 1]"},
+      {"name": "Mid-array pair", "code": "assert two_sum([3, 2, 4], 6) == [1, 2]"},
+      {"name": "Identical elements", "code": "assert two_sum([3, 3], 6) == [0, 1]"},
+      {"name": "Negative target", "code": "assert two_sum([-1, -2, -3, -4, -5], -8) == [2, 4]"},
+      {"name": "Zero element", "code": "assert two_sum([0, 4, 3, 0], 0) == [0, 3]"}
+    ]
+  },
+  {
+    "id": "is_palindrome",
+    "title": "Valid Palindrome",
+    "description": "Given a string `s`, return `True` if it is a palindrome considering only alphanumeric characters and ignoring cases, or `False` otherwise.",
+    "function_name": "is_palindrome",
+    "clean_code": "def is_palindrome(s):\n    filtered = [ch.lower() for ch in s if ch.isalnum()]\n    left = 0\n    right = len(filtered) - 1\n    while left < right:\n        if filtered[left] != filtered[right]:\n            return False\n        left = left + 1\n        right = right - 1\n    return True",
+    "test_cases": [
+      {"name": "A man a plan a canal Panama", "code": "assert is_palindrome('A man, a plan, a canal: Panama') == True"},
+      {"name": "race a car (non-palindrome)", "code": "assert is_palindrome('race a car') == False"},
+      {"name": "Empty string with spaces", "code": "assert is_palindrome('   ') == True"},
+      {"name": "Single character", "code": "assert is_palindrome('a.') == True"},
+      {"name": "Alphanumeric palindrome", "code": "assert is_palindrome('0P') == False"}
+    ]
+  },
+  {
+    "id": "binary_search",
+    "title": "Binary Search",
+    "description": "Given a sorted array of integers `nums` and a target value `target`, return the index of `target` if found, or `-1` if it is not present in `nums`.",
+    "function_name": "binary_search",
+    "clean_code": "def binary_search(nums, target):\n    low = 0\n    high = len(nums) - 1\n    while low <= high:\n        mid = (low + high) // 2\n        if nums[mid] == target:\n            return mid\n        elif nums[mid] < target:\n            low = mid + 1\n        else:\n            high = mid - 1\n    return -1",
+    "test_cases": [
+      {"name": "Element found at middle", "code": "assert binary_search([-1, 0, 3, 5, 9, 12], 9) == 4"},
+      {"name": "Element not present", "code": "assert binary_search([-1, 0, 3, 5, 9, 12], 2) == -1"},
+      {"name": "Single item match", "code": "assert binary_search([5], 5) == 0"},
+      {"name": "Single item mismatch", "code": "assert binary_search([5], 2) == -1"},
+      {"name": "Search boundary element", "code": "assert binary_search([1, 2, 3, 4, 5], 5) == 4"}
+    ]
+  },
+  {
+    "id": "max_subarray",
+    "title": "Maximum Subarray (Kadane)",
+    "description": "Given an integer array `nums`, find the subarray with the largest sum, and return its sum.",
+    "function_name": "max_subarray",
+    "clean_code": "def max_subarray(nums):\n    if not nums:\n        return 0\n    max_sum = nums[0]\n    current_sum = nums[0]\n    for i in range(1, len(nums)):\n        num = nums[i]\n        if current_sum + num > num:\n            current_sum = current_sum + num\n        else:\n            current_sum = num\n        if current_sum > max_sum:\n            max_sum = current_sum\n    return max_sum",
+    "test_cases": [
+      {"name": "Mixed positive and negative", "code": "assert max_subarray([-2, 1, -3, 4, -1, 2, 1, -5, 4]) == 6"},
+      {"name": "Single element", "code": "assert max_subarray([1]) == 1"},
+      {"name": "All positive values", "code": "assert max_subarray([5, 4, -1, 7, 8]) == 23"},
+      {"name": "All negative values", "code": "assert max_subarray([-3, -2, -5, -1]) == -1"},
+      {"name": "Alternating values", "code": "assert max_subarray([2, -1, 3, -2, 4]) == 6"}
+    ]
+  },
+  {
+    "id": "fibonacci",
+    "title": "Nth Fibonacci Number",
+    "description": "Return the nth Fibonacci number, where `F(0) = 0`, `F(1) = 1`, and `F(n) = F(n-1) + F(n-2)` for `n >= 2`.",
+    "function_name": "fibonacci",
+    "clean_code": "def fibonacci(n):\n    if n <= 0:\n        return 0\n    elif n == 1:\n        return 1\n    a = 0\n    b = 1\n    for i in range(2, n + 1):\n        c = a + b\n        a = b\n        b = c\n    return b",
+    "test_cases": [
+      {"name": "Base case 0", "code": "assert fibonacci(0) == 0"},
+      {"name": "Base case 1", "code": "assert fibonacci(1) == 1"},
+      {"name": "Small fib (n=2)", "code": "assert fibonacci(2) == 1"},
+      {"name": "Medium fib (n=6)", "code": "assert fibonacci(6) == 8"},
+      {"name": "Larger fib (n=10)", "code": "assert fibonacci(10) == 55"}
+    ]
+  },
+  {
+    "id": "count_vowels",
+    "title": "Count Vowels",
+    "description": "Given a string `text`, return the total number of vowels ('a', 'e', 'i', 'o', 'u', case-insensitive) in the string.",
+    "function_name": "count_vowels",
+    "clean_code": "def count_vowels(text):\n    vowels = set('aeiouAEIOU')\n    count = 0\n    for ch in text:\n        if ch in vowels:\n            count = count + 1\n    return count",
+    "test_cases": [
+      {"name": "Hello World", "code": "assert count_vowels('Hello World') == 3"},
+      {"name": "All vowels", "code": "assert count_vowels('AeIoU') == 5"},
+      {"name": "No vowels", "code": "assert count_vowels('xyz 123 !?') == 0"},
+      {"name": "Repeated vowels", "code": "assert count_vowels('Programming is awesome') == 8"},
+      {"name": "Empty string", "code": "assert count_vowels('') == 0"}
+    ]
+  },
+  {
+    "id": "reverse_words",
+    "title": "Reverse Words in a String",
+    "description": "Given an input string `s`, reverse the order of the words. Return a string of the words in reverse order concatenated by a single space, without leading or trailing spaces.",
+    "function_name": "reverse_words",
+    "clean_code": "def reverse_words(s):\n    words = s.strip().split()\n    words.reverse()\n    return ' '.join(words)",
+    "test_cases": [
+      {"name": "Simple sentence", "code": "assert reverse_words('the sky is blue') == 'blue is sky the'"},
+      {"name": "Surrounding whitespace", "code": "assert reverse_words('  hello world  ') == 'world hello'"},
+      {"name": "Multiple spaces between words", "code": "assert reverse_words('a good   example') == 'example good a'"},
+      {"name": "Single word", "code": "assert reverse_words('Antigravity') == 'Antigravity'"},
+      {"name": "Punctuation in words", "code": "assert reverse_words('code! duel? now.') == 'now. duel? code!'"}
+    ]
+  },
+  {
+    "id": "fizz_buzz",
+    "title": "FizzBuzz Generator",
+    "description": "Given an integer `n`, return a list of strings representing FizzBuzz from 1 to `n`. Return 'FizzBuzz' if divisible by 3 and 5, 'Fizz' if divisible by 3, 'Buzz' if divisible by 5, else the number as string.",
+    "function_name": "fizz_buzz",
+    "clean_code": "def fizz_buzz(n):\n    result = []\n    for i in range(1, n + 1):\n        if i % 15 == 0:\n            result.append('FizzBuzz')\n        elif i % 3 == 0:\n            result.append('Fizz')\n        elif i % 5 == 0:\n            result.append('Buzz')\n        else:\n            result.append(str(i))\n    return result",
+    "test_cases": [
+      {"name": "First 3 elements", "code": "assert fizz_buzz(3) == ['1', '2', 'Fizz']"},
+      {"name": "First 5 elements", "code": "assert fizz_buzz(5) == ['1', '2', 'Fizz', '4', 'Buzz']"},
+      {"name": "Includes FizzBuzz at 15", "code": "assert fizz_buzz(15)[-1] == 'FizzBuzz'"},
+      {"name": "Total length check for n=16", "code": "assert len(fizz_buzz(16)) == 16 and fizz_buzz(16)[14] == 'FizzBuzz' and fizz_buzz(16)[15] == '16'"}
+    ]
+  }
+]
