@@ -87,15 +87,30 @@ async def flow():
     assert room.status == "ACTIVE", "auto-start with 2 players"
     r = await rm.register_connection(c, "c", "auto", "Cy", ws["c"])
     assert r["assigned_role"] == "spectator"
-    await rm.handle_spectator_vote(c, "c", "player_1")
+    # Cy guesses player_2 (Bob) and guesses the current bug correctly
+    await rm.handle_spectator_vote(c, "c", "player_2")
+    actual_bug = room.problem["mutation_category"]
+    await rm.handle_bug_guess(c, "c", actual_bug)
     await rm.handle_next_bug_vote(c, "c", "arithmetic")
     total = len(room.problem["test_cases"])
     await rm.handle_progress_update(c, "a", 1, total)
     await rm.handle_progress_update(c, "b", total, total)
     assert room.status == "FINISHED" and room.winner["name"] == "Bob"
+    assert room.crowd_callout is not None
+    assert "CROWD" in room.crowd_callout["headline"] or "NAILED" in room.crowd_callout["headline"] or "BOB" in room.crowd_callout["headline"]
+    # Check Cy's leaderboard entry
+    cy_entry = next((e for e in room.leaderboard.values() if e["name"] == "Cy"), None)
+    assert cy_entry is not None
+    assert cy_entry["score"] == 250  # 100 for winner + 150 for bug
+    assert cy_entry["round_points"] == 250
+
     await rm.start_next_round(c)
     assert room.status == "ACTIVE" and room.round == 2
     assert room.problem["mutation_category"] == "arithmetic"
+    # Cy's cumulative score should still be 250
+    assert cy_entry["score"] == 250
+    assert cy_entry["round_points"] == 0
+
     # timeout path
     await rm.handle_progress_update(c, "a", 2, len(room.problem["test_cases"]))
     await rm._finish_on_timeout(room)
