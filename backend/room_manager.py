@@ -29,6 +29,11 @@ class Room:
         self.spectator_count = 0
         self.predictions = {"player_1": 0, "player_2": 0}
         self.voted_prediction_clients: Set[str] = set()
+        self.bug_guesses = {c: 0 for c in VOTE_CATEGORIES}
+        self.voted_bug_guess_clients: Set[str] = set()
+        self.spectator_guesses: Dict[str, Dict[str, Any]] = {}
+        self.leaderboard: Dict[str, Dict[str, Any]] = {}
+        self.crowd_callout: Optional[Dict[str, Any]] = None
         self.next_bug_votes = {c: 0 for c in VOTE_CATEGORIES}
         self.voted_bug_clients: Set[str] = set()
         self.event_log: List[str] = [f"Arena {room_code} open. Waiting for 2 challengers."]
@@ -77,6 +82,22 @@ class Room:
             {k: v for k, v in p.items() if k != "code"} for p in self.players
         ]
 
+        leaderboard_list = [
+            {
+                "id": entry["id"],
+                "name": entry["name"],
+                "score": entry["score"],
+                "round_points": entry.get("round_points", 0),
+                "correct_winner": entry.get("correct_winner_round", False),
+                "correct_bug": entry.get("correct_bug_round", False),
+            }
+            for entry in sorted(
+                self.leaderboard.values(),
+                key=lambda x: (x.get("score", 0), x.get("round_points", 0)),
+                reverse=True,
+            )[:8]
+        ]
+
         return {
             "type": "ROOM_STATE",
             "room_code": self.room_code,
@@ -86,7 +107,10 @@ class Room:
             "players": players,
             "spectator_count": self.spectator_count,
             "predictions": self.predictions,
+            "bug_guesses": self.bug_guesses,
             "next_bug_votes": self.next_bug_votes,
+            "leaderboard": leaderboard_list,
+            "crowd_callout": self.crowd_callout,
             "event_log": self.event_log,
             "winner": self.winner,
             "finish_reason": self.finish_reason,
@@ -119,6 +143,9 @@ class RoomManager:
         from ast_mutator import mutate_code
 
         m = mutate_code(template["clean_code"], preferred_category=category)
+        cat = m["mutation_category"]
+        if cat in ("comparison", "logic"):
+            cat = "inverted_condition"
         return {
             "id": template["id"],
             "title": template["title"],
@@ -127,7 +154,7 @@ class RoomManager:
             "clean_code": template["clean_code"],
             "buggy_code": m["buggy_code"],
             "test_cases": template["test_cases"],
-            "mutation_category": m["mutation_category"],
+            "mutation_category": cat,
             "description_bug": m["description"],
             "diff": m["diff"],
         }
@@ -300,6 +327,7 @@ class RoomManager:
             room.log_event("TIME UP! Nobody fixed a thing. Draw.")
         for p in room.players:
             p["status"] = "finished"
+        self._score_round(room)
         await self.broadcast(room.room_code)
 
     async def handle_start_match(self, room_code: str):
@@ -374,7 +402,89 @@ class RoomManager:
             "total": player["total"],
         }
         room.log_event(f"VICTORY! {player['name']} fixed the bug in {completion}s")
+        self._score_round(room)
         await self.broadcast(room.room_code)
+
+    def _score_round(self, room: Room):
+        winning_slot = room.winner.get("player_index") if room.winner else None
+        actual_bug = room.problem.get("mutation_category")
+
+        # Score each spectator who submitted any guess
+        for client_id, guess in room.spectator_guesses.items():
+            name = guess.get("name") or "Spectator"
+            round_pts = 0
+            correct_winner = False
+            correct_bug = False
+
+            if winning_slot and guess.get("winner") == winning_slot:
+                round_pts += 100
+                correct_winner = True
+            if actual_bug and guess.get("bug") == actual_bug:
+                round_pts += 150
+                correct_bug = True
+
+            if client_id not in room.leaderboard:
+                room.leaderboard[client_id] = {
+                    "id": client_id,
+                    "name": name,
+                    "score": 0,
+                    "correct_winner": 0,
+                    "correct_bug": 0,
+                }
+            entry = room.leaderboard[client_id]
+            entry["name"] = name
+            entry["score"] += round_pts
+            entry["round_points"] = round_pts
+            entry["correct_winner_round"] = correct_winner
+            entry["correct_bug_round"] = correct_bug
+            if correct_winner:
+                entry["correct_winner"] += 1
+            if correct_bug:
+                entry["correct_bug"] += 1
+
+        # Calculate crowd accuracy
+        total_w_votes = room.predictions["player_1"] + room.predictions["player_2"]
+        total_b_votes = sum(room.bug_guesses.values())
+
+        w_pct = 0
+        if winning_slot and total_w_votes > 0:
+            w_pct = round((room.predictions[winning_slot] / total_w_votes) * 100)
+
+        b_pct = 0
+        if actual_bug and total_b_votes > 0:
+            b_pct = round((room.bug_guesses.get(actual_bug, 0) / total_b_votes) * 100)
+
+        if room.winner:
+            w_name = room.winner["name"].upper()
+            if total_w_votes == 0:
+                headline = f"{w_name} TOOK THE CROWN!"
+                subtitle = "The duelists battled without audience predictions this round."
+            elif w_pct >= 60:
+                headline = f"CROWD NAILED IT: {w_pct}% PICKED {w_name}!"
+                subtitle = f"The crowd saw {w_name}'s victory coming from a mile away."
+            elif w_pct <= 35:
+                headline = f"UPSET! ONLY {w_pct}% BACKED {w_name}!"
+                subtitle = f"{w_name} defied the odds and out-coded the crowd's favorite!"
+            else:
+                headline = f"SPLIT CROWD: {w_pct}% CALLED IT RIGHT"
+                subtitle = f"A fierce duel that divided the crowd to the very end."
+        else:
+            if b_pct >= 50:
+                headline = "THE CROWD OUT-GUESSED THE DUELISTS!"
+                subtitle = f"{b_pct}% of the audience spotted the bug, but both duelists ran out of time!"
+            elif room.finish_reason == "timeout":
+                headline = "CLOCK BEAT THE DUELISTS!"
+                subtitle = "Time ran out before anyone could fix all tests."
+            else:
+                headline = "DRAW: STALEMATE IN THE ARENA"
+                subtitle = "Both challengers fought to an even standstill."
+
+        room.crowd_callout = {
+            "headline": headline,
+            "subtitle": subtitle,
+            "winner_pct": w_pct,
+            "bug_pct": b_pct,
+        }
 
     async def handle_submit_win(self, room_code: str, client_id: str, code: str, passed: int, total: int):
         # Same as a progress update that passed everything
@@ -387,7 +497,30 @@ class RoomManager:
         if target in room.predictions:
             room.predictions[target] += 1
             room.voted_prediction_clients.add(client_id)
-            room.log_event(f"Crowd bets on {'Player 1' if target == 'player_1' else 'Player 2'}")
+            conn = room.connections.get(client_id, {})
+            name = conn.get("name") or "Spectator"
+            if client_id not in room.spectator_guesses:
+                room.spectator_guesses[client_id] = {"name": name, "winner": None, "bug": None}
+            room.spectator_guesses[client_id]["winner"] = target
+            room.spectator_guesses[client_id]["name"] = name
+            target_label = "Player 1" if target == "player_1" else "Player 2"
+            room.log_event(f"{name} bet on {target_label}")
+            await self.broadcast(room_code)
+
+    async def handle_bug_guess(self, room_code: str, client_id: str, category: str):
+        room = self.get_room(room_code)
+        if not room or client_id in room.voted_bug_guess_clients:
+            return
+        if category in room.bug_guesses:
+            room.bug_guesses[category] += 1
+            room.voted_bug_guess_clients.add(client_id)
+            conn = room.connections.get(client_id, {})
+            name = conn.get("name") or "Spectator"
+            if client_id not in room.spectator_guesses:
+                room.spectator_guesses[client_id] = {"name": name, "winner": None, "bug": None}
+            room.spectator_guesses[client_id]["bug"] = category
+            room.spectator_guesses[client_id]["name"] = name
+            room.log_event(f"{name} guessed bug: {category.replace('_', ' ')}")
             await self.broadcast(room_code)
 
     async def handle_next_bug_vote(self, room_code: str, client_id: str, category: str):
@@ -423,8 +556,18 @@ class RoomManager:
         room.round += 1
         room.predictions = {"player_1": 0, "player_2": 0}
         room.voted_prediction_clients.clear()
+        room.bug_guesses = {c: 0 for c in VOTE_CATEGORIES}
+        room.voted_bug_guess_clients.clear()
+        room.spectator_guesses.clear()
         room.next_bug_votes = {c: 0 for c in VOTE_CATEGORIES}
         room.voted_bug_clients.clear()
+        room.crowd_callout = None
+
+        # Reset round-specific flags on leaderboard entries while keeping cumulative scores
+        for entry in room.leaderboard.values():
+            entry["round_points"] = 0
+            entry["correct_winner_round"] = False
+            entry["correct_bug_round"] = False
 
         self._begin_round(
             room,
