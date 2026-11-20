@@ -66,7 +66,6 @@ export default function ArenaView() {
   const bugGuesses = room.bug_guesses || { off_by_one: 0, inverted_condition: 0, arithmetic: 0 };
   const totalBugGuesses = Object.values(bugGuesses).reduce((x, y) => x + y, 0);
 
-  const bugVotes = room.next_bug_votes || { off_by_one: 0, inverted_condition: 0, arithmetic: 0 };
   const labels: Record<string, string> = {
     off_by_one: 'OFF-BY-ONE',
     inverted_condition: 'INVERTED LOGIC',
@@ -287,7 +286,7 @@ export default function ArenaView() {
             </div>
           )}
 
-          {/* Host Next Round Action & Next Bug Crowd Choice */}
+          {/* Host Next Round Action */}
           <div className="flex items-center gap-3 mt-3">
             <InkArrow width={80} className="hidden sm:block" />
             <button
@@ -296,13 +295,6 @@ export default function ArenaView() {
             >
               LAUNCH NEXT ROUND
             </button>
-          </div>
-
-          <div className="font-hand text-xs sm:text-sm text-black/70 mt-1">
-            spectator vote for next round:{' '}
-            {Object.keys(labels)
-              .map((k) => `${labels[k]} (${bugVotes[k as keyof typeof bugVotes] ?? 0})`)
-              .join(' • ')}
           </div>
         </div>
       )}

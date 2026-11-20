@@ -5,14 +5,34 @@ import type { RoomSession } from '../hooks/useWebSocket';
 import { Crowd, DoodlePlayer1, DoodlePlayer2, DoodleBug } from '../components/Doodles';
 
 const BUG_OPTIONS: { id: BugCategory; label: string; hint: string }[] = [
-  { id: 'off_by_one', label: 'OFF-BY-ONE', hint: 'range() / index slips by 1' },
-  { id: 'inverted_condition', label: 'INVERTED LOGIC', hint: 'if flips to if not / wrong condition' },
-  { id: 'arithmetic', label: 'BROKEN MATH', hint: '+ becomes -, * becomes //' },
+  { id: 'off_by_one', label: 'OFF-BY-ONE', hint: 'range() / index boundary slips by 1' },
+  { id: 'inverted_condition', label: 'INVERTED LOGIC', hint: 'if condition inverted / comparison flipped' },
+  { id: 'arithmetic', label: 'BROKEN MATH', hint: '+ becomes -, * becomes // operator' },
 ];
+
+function getFixSummary(category?: string | null, title?: string): string {
+  if (category === 'off_by_one') {
+    return 'The loop or slicing range was offset by 1, omitting a boundary element or terminating early. The fix restores the complete iteration bounds so every index is evaluated.';
+  }
+  if (category === 'inverted_condition') {
+    return 'A conditional branch had its boolean logic inverted or comparison operator flipped. The fix restores the valid conditional check so truthy cases branch to the correct logic.';
+  }
+  if (category === 'arithmetic') {
+    return 'A mathematical operator was mutated (such as swapping + for - or * for //). The fix restores the correct arithmetic operation to produce the expected numeric output.';
+  }
+  return `Review the logic in ${title || 'the algorithm'} to ensure edge cases and operation outputs match the problem specification.`;
+}
+
+function getFallbackBugExplanation(category?: string | null): string {
+  if (category === 'off_by_one') return 'Off-by-one index error in range iteration or list boundary.';
+  if (category === 'inverted_condition') return 'Inverted boolean condition or flipped comparison operator.';
+  if (category === 'arithmetic') return 'Altered arithmetic calculation or wrong mathematical operator.';
+  return 'A procedural logic mutation broke one or more unit tests.';
+}
 
 function Bar({ passed, total }: { passed: number; total: number }) {
   return (
-    <div className="flex gap-0 b h-5 w-full bg-paper">
+    <div className="flex gap-0 b h-4 sm:h-5 w-full bg-paper">
       {Array.from({ length: Math.max(total, 1) }).map((_, i) => (
         <div key={i} className={`flex-1 ${i < passed ? 'bg-black' : 'bg-paper'} ${i > 0 ? 'bl' : ''}`} />
       ))}
@@ -21,7 +41,7 @@ function Bar({ passed, total }: { passed: number; total: number }) {
 }
 
 export default function SpectatorView({ session }: { session: RoomSession }) {
-  const { roomState: room, isConnected, secondsLeft, votePrediction, guessBug, voteNextBug } = session;
+  const { roomState: room, isConnected, secondsLeft, votePrediction, guessBug } = session;
   const round = room?.round ?? 1;
   const roomCode = room?.room_code ?? '';
 
@@ -31,15 +51,11 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
   const [guessedBug, setGuessedBug] = useState<BugCategory | null>(() => {
     return (sessionStorage.getItem(`ba_b_${roomCode}_${round}`) as BugCategory) || null;
   });
-  const [votedNextBug, setVotedNextBug] = useState<BugCategory | null>(() => {
-    return (sessionStorage.getItem(`ba_n_${roomCode}_${round}`) as BugCategory) || null;
-  });
 
   // Reset local state when a new round starts
   useEffect(() => {
     setPredictedWinner((sessionStorage.getItem(`ba_w_${roomCode}_${round}`) as PlayerSlot) || null);
     setGuessedBug((sessionStorage.getItem(`ba_b_${roomCode}_${round}`) as BugCategory) || null);
-    setVotedNextBug((sessionStorage.getItem(`ba_n_${roomCode}_${round}`) as BugCategory) || null);
   }, [round, roomCode]);
 
   if (!room) return null;
@@ -50,9 +66,6 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
 
   const bugGuesses = room.bug_guesses || { off_by_one: 0, inverted_condition: 0, arithmetic: 0 };
   const totalBugGuesses = Object.values(bugGuesses).reduce((x, y) => x + y, 0);
-
-  const nextBugVotes = room.next_bug_votes || { off_by_one: 0, inverted_condition: 0, arithmetic: 0 };
-  const totalNextVotes = Object.values(nextBugVotes).reduce((x, y) => x + y, 0);
 
   const handlePredictWinner = (slot: PlayerSlot) => {
     if (predictedWinner || room.status !== 'ACTIVE') return;
@@ -68,13 +81,6 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
     guessBug(cat);
   };
 
-  const handleVoteNextBug = (cat: BugCategory) => {
-    if (votedNextBug) return;
-    setVotedNextBug(cat);
-    sessionStorage.setItem(`ba_n_${roomCode}_${round}`, cat);
-    voteNextBug(cat);
-  };
-
   // Score computation for this spectator
   const winningSlot = room.winner?.player_index;
   const actualBug = room.problem?.mutation_category;
@@ -83,49 +89,49 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
   const roundPoints = (wasWinnerCorrect ? 100 : 0) + (wasBugCorrect ? 150 : 0);
 
   return (
-    <div className="min-h-dvh bg-paper text-black border-x-0 sm:border-x-[1.5px] border-black max-w-xl mx-auto flex flex-col pb-8">
-      {/* Header */}
-      <header className="bb flex items-stretch justify-between bg-paper sticky top-0 z-20">
-        <div className="flex items-center gap-2 px-3 py-2">
+    <div className="min-h-dvh w-full max-w-xl mx-auto flex flex-col overflow-x-hidden bg-paper text-black border-x-0 sm:border-x-[1.5px] border-black pb-8">
+      {/* Top Header Bar */}
+      <header className="bb flex items-stretch justify-between bg-paper sticky top-0 z-20 select-none">
+        <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-2">
           <span className="font-heading font-extrabold text-base sm:text-lg">BUGARENA</span>
-          <DoodleBug size={20} />
+          <DoodleBug size={20} className="shrink-0" />
         </div>
-        <div className="bl px-3 flex items-center font-bold text-xs sm:text-sm bg-[#CCFF00] border-l-[1.5px] border-black">
+        <div className="bl px-3 flex items-center font-bold font-mono text-xs sm:text-sm bg-[#CCFF00] border-l-[1.5px] border-black shrink-0">
           ROOM {room.room_code}
         </div>
       </header>
 
-      {/* Match Meta Bar */}
+      {/* Match Status Bar */}
       <div className="grid grid-cols-3 bb text-center bg-paper">
-        <div className="br py-2">
-          <div className="font-hand text-[11px] sm:text-xs text-black/70">STATUS</div>
-          <div className="font-bold text-xs sm:text-sm">
+        <div className="br py-2 px-1">
+          <div className="font-hand text-[10px] sm:text-xs text-black/70">STATUS</div>
+          <div className="font-bold text-xs sm:text-sm truncate">
             {room.status === 'WAITING' ? 'LOBBY' : room.status === 'ACTIVE' ? 'LIVE DUEL' : 'FINISHED'}
           </div>
         </div>
-        <div className="br py-2">
-          <div className="font-hand text-[11px] sm:text-xs text-black/70">TIME</div>
-          <div className="font-bold text-xs sm:text-sm">{formatClock(secondsLeft)}</div>
+        <div className="br py-2 px-1">
+          <div className="font-hand text-[10px] sm:text-xs text-black/70">TIME</div>
+          <div className="font-bold font-mono text-xs sm:text-sm">{formatClock(secondsLeft)}</div>
         </div>
-        <div className="py-2">
-          <div className="font-hand text-[11px] sm:text-xs text-black/70">ROUND</div>
-          <div className="font-bold text-xs sm:text-sm">{room.round}</div>
+        <div className="py-2 px-1">
+          <div className="font-hand text-[10px] sm:text-xs text-black/70">ROUND</div>
+          <div className="font-bold font-mono text-xs sm:text-sm">{room.round}</div>
         </div>
       </div>
 
       {/* Live Duelists Progress */}
-      <section className="bb p-3 flex flex-col gap-3 bg-white">
-        <div className="flex justify-between items-center">
-          <span className="font-heading font-extrabold text-xs tracking-wider">DUEL PROGRESS</span>
-          <span className="font-hand text-xs">{room.problem.title}</span>
+      <section className="bb p-3 flex flex-col gap-2.5 bg-white">
+        <div className="flex justify-between items-center text-xs">
+          <span className="font-heading font-extrabold tracking-wider">DUEL PROGRESS</span>
+          <span className="font-hand text-black/70 truncate max-w-[200px]">{room.problem.title}</span>
         </div>
         {[p1, p2].map((p, i) => (
-          <div key={i} className="flex items-center gap-2.5 sm:gap-3">
-            {i === 0 ? <DoodlePlayer1 size={40} /> : <DoodlePlayer2 size={40} />}
+          <div key={i} className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            {i === 0 ? <DoodlePlayer1 size={36} className="shrink-0" /> : <DoodlePlayer2 size={36} className="shrink-0" />}
             <div className="flex-1 min-w-0">
               <div className="flex justify-between text-xs font-bold mb-1">
                 <span className="truncate">{p ? p.name : `PLAYER ${i + 1}: waiting...`}</span>
-                <span className="ml-2 shrink-0">{p ? `${p.passed}/${p.total}` : '-'}</span>
+                <span className="ml-2 font-mono shrink-0">{p ? `${p.passed}/${p.total}` : '-'}</span>
               </div>
               <Bar passed={p?.passed ?? 0} total={p?.total ?? room.problem.test_cases.length} />
             </div>
@@ -133,13 +139,15 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
         ))}
       </section>
 
-      {/* END-OF-ROUND FINISHED RESULTS & LEADERBOARD */}
+      {/* ============================================================== */}
+      {/* END-OF-ROUND FINISHED RESULTS, LEADERBOARD & BUG EXPLANATION */}
+      {/* ============================================================== */}
       {room.status === 'FINISHED' && (
         <section className="bb bg-white flex flex-col">
           {/* Winner Banner */}
           <div className="bg-black text-white p-4 text-center">
             <div className="font-hand text-xs text-[#CCFF00] tracking-widest uppercase">ROUND {room.round} COMPLETED</div>
-            <div className="font-display italic text-3xl sm:text-4xl mt-1">
+            <div className="font-display italic text-3xl sm:text-4xl mt-1 leading-tight">
               {room.winner ? `${room.winner.name} wins!` : 'Stalemate / Draw!'}
             </div>
             {room.winner && (
@@ -159,7 +167,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
               <div className="font-hand text-xs mt-1 leading-snug">
                 {room.crowd_callout.subtitle}
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-black text-[11px] font-bold">
+              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-black text-[11px] font-bold font-mono">
                 <div>WINNER PICK: {room.crowd_callout.winner_pct}%</div>
                 <div>BUG GUESS: {room.crowd_callout.bug_pct}%</div>
               </div>
@@ -176,16 +184,59 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
             </div>
             <div className="flex justify-between items-center text-xs py-1">
               <span>Winner Pick: <strong className="uppercase">{predictedWinner ? (predictedWinner === 'player_1' ? (p1?.name || 'Player 1') : (p2?.name || 'Player 2')) : 'None'}</strong></span>
-              <span className={`font-bold ${wasWinnerCorrect ? 'text-black' : 'text-black/60'}`}>
+              <span className={`font-bold text-[11px] ${wasWinnerCorrect ? 'text-black' : 'text-black/60'}`}>
                 {wasWinnerCorrect ? '✓ CORRECT (+100)' : predictedWinner ? '✗ MISSED (0)' : 'NO GUESS'}
               </span>
             </div>
             <div className="flex justify-between items-center text-xs py-1">
               <span>Bug Pick: <strong className="uppercase">{guessedBug ? guessedBug.replace('_', ' ') : 'None'}</strong></span>
-              <span className={`font-bold ${wasBugCorrect ? 'text-black' : 'text-black/60'}`}>
+              <span className={`font-bold text-[11px] ${wasBugCorrect ? 'text-black' : 'text-black/60'}`}>
                 {wasBugCorrect ? '✓ CORRECT (+150)' : guessedBug ? '✗ MISSED (0)' : 'NO GUESS'}
               </span>
             </div>
+          </div>
+
+          {/* ========================================================== */}
+          {/* POST-ROUND BUG & FIX EXPLANATION CARD (Spectator Educational) */}
+          {/* ========================================================== */}
+          <div className="mx-3 mb-3 p-3.5 b bg-white">
+            <div className="flex items-center justify-between bb pb-2 mb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="font-heading font-extrabold text-xs tracking-wider uppercase">
+                  THE BUG & SOLUTION
+                </span>
+                <span className="bg-[#CCFF00] text-black border border-black px-1.5 py-0.2 font-mono text-[10px] font-bold uppercase">
+                  {actualBug ? actualBug.replace('_', ' ') : 'DEBUGGED'}
+                </span>
+              </div>
+              <span className="font-hand text-xs text-black/60">code breakdown</span>
+            </div>
+
+            {/* Injected Bug Description */}
+            <div className="text-xs">
+              <div className="font-bold text-black uppercase tracking-wider mb-1">WHAT WENT WRONG:</div>
+              <div className="bg-paper p-2.5 b font-mono text-[11px] leading-relaxed break-words text-black/90">
+                {room.problem.description_bug || getFallbackBugExplanation(actualBug)}
+              </div>
+            </div>
+
+            {/* Plain English Fix Explanation */}
+            <div className="text-xs mt-3">
+              <div className="font-bold text-black uppercase tracking-wider mb-1">HOW TO FIX IT:</div>
+              <p className="font-hand text-xs text-black/85 leading-relaxed bg-[#CCFF00]/15 p-2.5 border border-black/30">
+                {getFixSummary(actualBug, room.problem.title)}
+              </p>
+            </div>
+
+            {/* Code Diff Box */}
+            {room.problem.diff && (
+              <div className="mt-3">
+                <div className="font-bold text-xs uppercase tracking-wider mb-1">PATCH DIFF:</div>
+                <pre className="bg-[#111] text-[#CCFF00] p-2.5 font-mono text-[10px] sm:text-[11px] overflow-x-auto border border-black max-h-48 leading-tight">
+                  {room.problem.diff}
+                </pre>
+              </div>
+            )}
           </div>
 
           {/* Top Crowd Predictors Leaderboard */}
@@ -238,7 +289,9 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
         </section>
       )}
 
+      {/* ============================================================== */}
       {/* 1. WINNER GUESS (+100 PTS) */}
+      {/* ============================================================== */}
       <section className="bb bg-white">
         <div className="px-3 py-2 bb flex justify-between items-center bg-paper">
           <div>
@@ -246,7 +299,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
             <span className="ml-2 font-hand text-xs text-black/70">+100 PTS</span>
           </div>
           {predictedWinner && (
-            <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase">
+            <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shrink-0">
               LOCKED IN: {predictedWinner === 'player_1' ? (p1?.name || 'P1') : (p2?.name || 'P2')}
             </span>
           )}
@@ -262,7 +315,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
                 key={slot}
                 disabled={disabled}
                 onClick={() => handlePredictWinner(slot)}
-                className={`py-3.5 sm:py-4 px-2 font-bold text-xs sm:text-sm transition-colors ${i === 0 ? 'br' : ''} ${
+                className={`py-3.5 sm:py-4 px-2 font-bold text-xs sm:text-sm transition-colors min-h-[48px] ${i === 0 ? 'br' : ''} ${
                   chosen
                     ? 'bg-black text-white'
                     : 'bg-white text-black hover:bg-black/5'
@@ -280,9 +333,9 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
         {/* Live Tug-of-War Bar */}
         <div className="bt p-2.5 bg-paper">
           <div className="flex justify-between text-[11px] font-bold mb-1">
-            <span>{p1?.name || 'PLAYER 1'}: {aPct}%</span>
-            <span className="font-hand text-[10px] text-black/60">CROWD TALLY</span>
-            <span>{p2?.name || 'PLAYER 2'}: {100 - aPct}%</span>
+            <span className="truncate max-w-[120px]">{p1?.name || 'PLAYER 1'}: {aPct}%</span>
+            <span className="font-hand text-[10px] text-black/60 shrink-0">CROWD TALLY</span>
+            <span className="truncate max-w-[120px] text-right">{p2?.name || 'PLAYER 2'}: {100 - aPct}%</span>
           </div>
           <div className="flex h-3.5 sm:h-4 b bg-white">
             <div className="bg-black transition-all duration-300" style={{ width: `${aPct}%` }} />
@@ -291,7 +344,9 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
         </div>
       </section>
 
+      {/* ============================================================== */}
       {/* 2. CURRENT BUG GUESS (+150 PTS) */}
+      {/* ============================================================== */}
       <section className="bb bg-white">
         <div className="px-3 py-2 bb flex justify-between items-center bg-paper">
           <div>
@@ -299,13 +354,13 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
             <span className="ml-2 font-hand text-xs text-black/70">+150 PTS</span>
           </div>
           {guessedBug && (
-            <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase">
+            <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shrink-0">
               LOCKED IN: {guessedBug.replace('_', ' ')}
             </span>
           )}
         </div>
 
-        <div className="p-2 text-xs font-hand text-black/70">
+        <div className="p-2.5 text-xs font-hand text-black/70">
           What glitch is lurking in the code? Spot it before duelists finish:
         </div>
 
@@ -319,70 +374,26 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
               key={o.id}
               disabled={disabled}
               onClick={() => handleGuessBug(o.id)}
-              className={`relative w-full text-left px-3 py-3 ${i > 0 ? 'bt' : ''} bg-white transition-colors ${
+              className={`relative w-full text-left px-3 py-3 min-h-[48px] ${i > 0 ? 'bt' : ''} bg-white transition-colors ${
                 chosen ? 'bg-[#CCFF00]/25' : ''
               } ${disabled && !chosen ? 'opacity-40 cursor-not-allowed' : disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-black/5'}`}
             >
-              {/* Live Crowd Guess % Indicator */}
+              {/* Live Crowd Guess % Fill Indicator */}
               <div className="absolute inset-y-0 left-0 bg-black/10" style={{ width: `${pct}%` }} />
               <div className="relative flex justify-between items-center">
-                <div>
+                <div className="min-w-0 pr-2">
                   <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
                     <span>{chosen ? '[x]' : '[ ]'}</span>
                     <span>{o.label}</span>
                     {chosen && (
-                      <span className="ml-2 bg-black text-white px-1.5 py-0.2 text-[10px]">
+                      <span className="ml-2 bg-black text-white px-1.5 py-0.2 text-[10px] shrink-0 font-mono">
                         LOCKED (+150)
                       </span>
                     )}
                   </div>
-                  <div className="font-hand text-[11px] sm:text-xs text-black/70 mt-0.5">{o.hint}</div>
+                  <div className="font-hand text-[11px] sm:text-xs text-black/70 mt-0.5 truncate">{o.hint}</div>
                 </div>
-                <div className="font-mono text-xs font-bold shrink-0 ml-2">
-                  {pct}% ({count})
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </section>
-
-      {/* 3. VOTE NEXT ROUND BUG CATEGORY */}
-      <section className="bb bg-white">
-        <div className="px-3 py-2 bb flex justify-between items-center bg-paper">
-          <div>
-            <span className="font-heading font-extrabold text-xs tracking-wider">3. VOTE NEXT ROUND'S BUG</span>
-            <span className="ml-2 font-hand text-xs text-black/70">crowd power</span>
-          </div>
-          {votedNextBug && (
-            <span className="bg-black text-white px-2 py-0.5 text-[10px] font-bold uppercase">
-              VOTED: {votedNextBug.replace('_', ' ')}
-            </span>
-          )}
-        </div>
-
-        {BUG_OPTIONS.map((o, i) => {
-          const count = nextBugVotes[o.id] ?? 0;
-          const pct = totalNextVotes > 0 ? Math.round((count / totalNextVotes) * 100) : 0;
-          const chosen = votedNextBug === o.id;
-          return (
-            <button
-              key={o.id}
-              disabled={!!votedNextBug}
-              onClick={() => handleVoteNextBug(o.id)}
-              className={`relative w-full text-left px-3 py-2.5 ${i > 0 ? 'bt' : ''} bg-white transition-colors ${
-                votedNextBug ? 'cursor-default' : 'cursor-pointer hover:bg-black/5'
-              }`}
-            >
-              <div className="absolute inset-y-0 left-0 bg-black/10" style={{ width: `${pct}%` }} />
-              <div className="relative flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-xs sm:text-sm">
-                    {chosen ? '● ' : '○ '}
-                    {o.label}
-                  </div>
-                </div>
-                <div className="font-mono text-xs font-bold">
+                <div className="font-mono text-xs font-bold shrink-0">
                   {pct}% ({count})
                 </div>
               </div>
