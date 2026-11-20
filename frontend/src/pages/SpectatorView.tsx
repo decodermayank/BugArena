@@ -51,39 +51,39 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
   };
 
   return (
-    <div className="min-h-dvh bg-paper text-black border-x-[1.5px] border-black max-w-xl mx-auto flex flex-col">
+    <div className="min-h-dvh bg-paper text-black border-x-0 sm:border-x-[1.5px] border-black max-w-xl mx-auto flex flex-col">
       <header className="bb flex items-stretch justify-between">
         <div className="flex items-center gap-2 px-3 py-2">
-          <span className="font-heading font-extrabold text-lg">BUGARENA</span>
-          <DoodleBug size={22} />
+          <span className="font-heading font-extrabold text-base sm:text-lg">BUGARENA</span>
+          <DoodleBug size={20} />
         </div>
-        <div className="bl px-3 flex items-center font-bold text-sm">ROOM {room.room_code}</div>
+        <div className="bl px-3 flex items-center font-bold text-xs sm:text-sm">ROOM {room.room_code}</div>
       </header>
 
       <div className="grid grid-cols-3 bb text-center">
         <div className="br py-2">
-          <div className="font-hand text-xs">STATUS</div>
-          <div className="font-bold text-sm">{room.status}</div>
+          <div className="font-hand text-[11px] sm:text-xs text-black/70">STATUS</div>
+          <div className="font-bold text-xs sm:text-sm">{room.status}</div>
         </div>
         <div className="br py-2">
-          <div className="font-hand text-xs">TIME</div>
-          <div className="font-bold text-sm">{formatClock(secondsLeft)}</div>
+          <div className="font-hand text-[11px] sm:text-xs text-black/70">TIME</div>
+          <div className="font-bold text-xs sm:text-sm">{formatClock(secondsLeft)}</div>
         </div>
         <div className="py-2">
-          <div className="font-hand text-xs">ROUND</div>
-          <div className="font-bold text-sm">{room.round}</div>
+          <div className="font-hand text-[11px] sm:text-xs text-black/70">ROUND</div>
+          <div className="font-bold text-xs sm:text-sm">{room.round}</div>
         </div>
       </div>
 
       {/* Live progress */}
       <section className="bb p-3 flex flex-col gap-3">
         {[p1, p2].map((p, i) => (
-          <div key={i} className="flex items-center gap-3">
-            {i === 0 ? <DoodlePlayer1 size={44} /> : <DoodlePlayer2 size={44} />}
-            <div className="flex-1">
+          <div key={i} className="flex items-center gap-2.5 sm:gap-3">
+            {i === 0 ? <DoodlePlayer1 size={40} /> : <DoodlePlayer2 size={40} />}
+            <div className="flex-1 min-w-0">
               <div className="flex justify-between text-xs font-bold mb-1">
-                <span>{p ? p.name : `PLAYER ${i + 1}: waiting...`}</span>
-                <span>{p ? `${p.passed}/${p.total}` : '-'}</span>
+                <span className="truncate">{p ? p.name : `PLAYER ${i + 1}: waiting...`}</span>
+                <span className="ml-2 shrink-0">{p ? `${p.passed}/${p.total}` : '-'}</span>
               </div>
               <Bar passed={p?.passed ?? 0} total={p?.total ?? room.problem.test_cases.length} />
             </div>
@@ -93,16 +93,16 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
 
       {room.status === 'FINISHED' && (
         <section className="bb bg-black text-white p-3 text-center">
-          <div className="font-display italic text-3xl">
+          <div className="font-display italic text-2xl sm:text-3xl">
             {room.winner ? `${room.winner.name} wins!` : 'Draw!'}
           </div>
-          <div className="font-hand text-sm">Vote the next bug below. Host hits NEXT ROUND.</div>
+          <div className="font-hand text-xs sm:text-sm mt-1">Vote the next bug below. Host hits NEXT ROUND.</div>
         </section>
       )}
 
       {/* Predict winner */}
       <section className="bb">
-        <h2 className="font-heading font-extrabold text-sm px-3 py-2 bb">PREDICT WINNER</h2>
+        <h2 className="font-heading font-extrabold text-xs sm:text-sm px-3 py-2 bb">PREDICT WINNER</h2>
         <div className="grid grid-cols-2">
           {(['player_1', 'player_2'] as PlayerSlot[]).map((slot, i) => {
             const pl = room.players[i];
@@ -112,17 +112,19 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
                 key={slot}
                 disabled={!!predicted}
                 onClick={() => predict(slot)}
-                className={`py-4 px-2 font-bold text-sm ${i === 0 ? 'br' : ''} ${
+                className={`py-3.5 sm:py-4 px-2 font-bold text-xs sm:text-sm ${i === 0 ? 'br' : ''} ${
                   chosen ? 'bg-black text-white' : 'bg-paper text-black'
                 } ${predicted && !chosen ? 'opacity-40' : 'cursor-pointer hover:bg-black hover:text-white'}`}
               >
-                {pl ? pl.name : `PLAYER ${i + 1}`}
-                <div className="font-hand font-normal text-xs">{chosen ? 'locked in!' : 'tap to bet'}</div>
+                <div className="truncate">{pl ? pl.name : `PLAYER ${i + 1}`}</div>
+                <div className="font-hand font-normal text-[11px] sm:text-xs mt-0.5">
+                  {chosen ? 'locked in!' : 'tap to bet'}
+                </div>
               </button>
             );
           })}
         </div>
-        <div className="flex h-4 bt">
+        <div className="flex h-3.5 sm:h-4 bt">
           <div className="bg-black transition-all" style={{ width: `${aPct}%` }} />
           <div className="hatch flex-1" />
         </div>
@@ -134,7 +136,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
 
       {/* Vote next bug */}
       <section className="bb">
-        <h2 className="font-heading font-extrabold text-sm px-3 py-2 bb">VOTE NEXT BUG</h2>
+        <h2 className="font-heading font-extrabold text-xs sm:text-sm px-3 py-2 bb">VOTE NEXT BUG</h2>
         {BUG_OPTIONS.map((o, i) => {
           const n = room.next_bug_votes[o.id] ?? 0;
           const pct = bugTotal ? Math.round((n / bugTotal) * 100) : 0;
@@ -151,21 +153,21 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
               <div className="absolute inset-y-0 left-0 bg-black/15" style={{ width: `${pct}%` }} />
               <div className="relative flex justify-between items-center">
                 <div>
-                  <div className="font-bold text-sm">
+                  <div className="font-bold text-xs sm:text-sm">
                     {chosen ? '[x] ' : '[ ] '}
                     {o.label}
                   </div>
-                  <div className="font-hand text-xs">{o.hint}</div>
+                  <div className="font-hand text-[11px] sm:text-xs text-black/75">{o.hint}</div>
                 </div>
-                <div className="font-bold text-sm">{n}</div>
+                <div className="font-bold text-xs sm:text-sm shrink-0 ml-2">{n}</div>
               </div>
             </button>
           );
         })}
       </section>
 
-      <footer className="mt-auto px-3 py-2 flex items-center justify-between">
-        <Crowd count={Math.min(room.spectator_count, 6)} size={28} />
+      <footer className="mt-auto px-3 py-2.5 flex items-center justify-between border-t border-black/15 sm:border-t-0">
+        <Crowd count={Math.min(room.spectator_count, 6)} size={26} />
         <span className="text-[11px] font-bold">
           {isConnected ? `${room.spectator_count} WATCHING` : 'RECONNECTING...'}
         </span>
