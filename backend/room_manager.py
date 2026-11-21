@@ -305,15 +305,13 @@ class RoomManager:
     async def handle_start_match(self, room_code: str):
         """Host click: START DUEL (works with 1 or 2 players)."""
         room = self.get_room(room_code)
-        if not room or room.status == "ACTIVE":
+        if not room or room.status == "FINISHED":
             return
-        if room.status == "FINISHED":
-            return
-        if len(room.players) < 1:
-            room.log_event("Need at least 1 challenger to start")
-            await self.broadcast(room_code)
-            return
-        self._begin_round(room, "Host started the duel. GO!")
+        if room.status != "ACTIVE":
+            if len(room.players) < 1:
+                room.log_event("Need at least 1 challenger to start")
+            else:
+                self._begin_round(room, "Host started the duel. GO!")
         await self.broadcast(room_code)
 
     def _player(self, room: Room, client_id: str):
@@ -365,6 +363,18 @@ class RoomManager:
         for p in room.players:
             p["status"] = "finished"
         completion = round(room.end_time - (room.start_time or room.end_time), 2)
+        import difflib
+        diff_text = room.problem.get("diff", "")
+        if code and room.problem.get("buggy_code"):
+            diff_lines = list(difflib.unified_diff(
+                room.problem["buggy_code"].splitlines(keepends=True),
+                code.splitlines(keepends=True),
+                fromfile="buggy.py",
+                tofile="solution.py",
+            ))
+            if diff_lines:
+                diff_text = "".join(diff_lines)
+
         room.winner = {
             "id": player["id"],
             "name": player["name"],
@@ -372,13 +382,22 @@ class RoomManager:
             "completion_time": completion,
             "passed": player["passed"],
             "total": player["total"],
+            "ast_diff": diff_text or room.problem.get("diff", ""),
         }
         room.log_event(f"VICTORY! {player['name']} fixed the bug in {completion}s")
         await self.broadcast(room.room_code)
 
     async def handle_submit_win(self, room_code: str, client_id: str, code: str, passed: int, total: int):
-        # Same as a progress update that passed everything
-        await self.handle_progress_update(room_code, client_id, passed, total, None)
+        room = self.get_room(room_code)
+        if not room or room.status != "ACTIVE":
+            return
+        player = self._player(room, client_id)
+        if not player:
+            return
+        player["passed"] = total
+        player["total"] = total
+        player["last_improve"] = time.time()
+        await self._declare_winner(room, player, "all_tests", code=code)
 
     async def handle_spectator_vote(self, room_code: str, client_id: str, target: str):
         room = self.get_room(room_code)
@@ -433,6 +452,17 @@ class RoomManager:
         await self.broadcast(room_code)
 
     # ------------------------------------------------------------- broadcast
+    async def broadcast_event(self, room_code: str, event_data: dict):
+        room = self.get_room(room_code)
+        if not room or not room.connections:
+            return
+        msg = json.dumps(event_data)
+        for c in list(room.connections.values()):
+            try:
+                await c["ws"].send_text(msg)
+            except Exception:
+                pass
+
     async def broadcast(self, room_code: str):
         room = self.get_room(room_code)
         if not room or not room.connections:

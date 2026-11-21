@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 
 interface DoodleProps {
   size?: number;
@@ -101,7 +101,38 @@ export function DoodleSpectatorC({ size = 40, className, style }: DoodleProps) {
   );
 }
 
-const CROWD = [DoodleSpectatorA, DoodleSpectatorB, DoodleSpectatorC];
+export const CROWD = [DoodleSpectatorA, DoodleSpectatorB, DoodleSpectatorC];
+
+export type AvatarPresetId = 'hacker' | 'hunter' | 'script' | 'speed' | 'glitch';
+
+export interface AvatarPreset {
+  id: AvatarPresetId;
+  name: string;
+  tag: string;
+  Component: (props: DoodleProps) => ReactElement;
+}
+
+export const AVATAR_PRESETS: AvatarPreset[] = [
+  { id: 'hacker', name: 'The Hacker', tag: '👓', Component: DoodlePlayer1 },
+  { id: 'hunter', name: 'Bug Hunter', tag: '🐛', Component: DoodleBug },
+  { id: 'script', name: 'Script Kid', tag: '🧢', Component: DoodleSpectatorB },
+  { id: 'speed', name: 'Speedrunner', tag: '⚡', Component: DoodlePlayer2 },
+  { id: 'glitch', name: 'Bot / Glitch', tag: '🤖', Component: DoodleSpectatorC },
+];
+
+export function AvatarIcon({
+  id,
+  size = 40,
+  className,
+}: {
+  id: AvatarPresetId | string;
+  size?: number;
+  className?: string;
+}) {
+  const match = AVATAR_PRESETS.find((a) => a.id === id) || AVATAR_PRESETS[0];
+  const Comp = match.Component;
+  return <Comp size={size} className={className} />;
+}
 
 /** A row of N monochrome spectator faces. */
 export function Crowd({ count, size = 40, className }: { count: number; size?: number; className?: string }) {

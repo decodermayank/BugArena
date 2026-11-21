@@ -68,7 +68,13 @@ export interface ErrorMessage {
   message: string;
 }
 
-export type ServerMessage = RoomState | ErrorMessage;
+export interface EmoteReactionMessage {
+  type: 'EMOTE_REACTION';
+  emote: string;
+  sender: string;
+}
+
+export type ServerMessage = RoomState | ErrorMessage | EmoteReactionMessage;
 
 export type ClientEvent =
   | { type: 'START_MATCH' }
@@ -76,7 +82,8 @@ export type ClientEvent =
   | { type: 'PROGRESS_UPDATE'; passed: number; total: number; error: string | null }
   | { type: 'SUBMIT_WIN'; code: string; passed: number; total: number }
   | { type: 'SPECTATOR_VOTE'; target: PlayerSlot }
-  | { type: 'NEXT_BUG_VOTE'; category: BugCategory };
+  | { type: 'NEXT_BUG_VOTE'; category: BugCategory }
+  | { type: 'EMOTE_REACTION'; emote: string };
 
 export interface SingleTestResult {
   name: string;

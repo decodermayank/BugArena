@@ -8,6 +8,8 @@ import { usePyodide } from '../hooks/usePyodide';
 import type { RequestedRole, TestRunResult } from '../types';
 import SpectatorView from './SpectatorView';
 import { DoodleBug, DoodlePlayer1, DoodlePlayer2, InkArrow } from '../components/Doodles';
+import SoundToggle from '../components/SoundToggle';
+import { soundFx } from '../utils/soundFx';
 
 const defineTheme: BeforeMount = (monaco) => {
   monaco.editor.defineTheme('bugarena', {
@@ -36,7 +38,9 @@ const defineTheme: BeforeMount = (monaco) => {
 function Gate({ text }: { text: string }) {
   return (
     <div className="min-h-dvh flex items-center justify-center bg-paper p-4">
-      <div className="b px-6 py-4 font-bold text-center">[!] {text}</div>
+      <div className="border-2 border-black bg-white px-6 py-4 font-bold text-center shadow-[4px_4px_0px_#000]">
+        [!] {text}
+      </div>
     </div>
   );
 }
@@ -58,7 +62,7 @@ export function SpectateRoute() {
 function Session({ roomCode, role, nickname }: { roomCode: string; role: RequestedRole; nickname: string }) {
   const session = useWebSocket({ roomCode, role, nickname });
   if (session.error) return <Gate text={`[!] ${session.error}`} />;
-  if (!session.roomState) return <Gate text="CONNECTING..." />;
+  if (!session.roomState) return <Gate text="CONNECTING TO BATTLE..." />;
   return session.assignedRole === 'player' ? <PlayerView session={session} /> : <SpectatorView session={session} />;
 }
 
@@ -68,6 +72,8 @@ export default function PlayerView({ session }: { session: RoomSession }) {
   const [code, setCode] = useState(room?.problem.buggy_code ?? '');
   const [result, setResult] = useState<TestRunResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'editor' | 'problem'>('editor');
+  const [expandedTest, setExpandedTest] = useState<number | null>(null);
   const lastKey = useRef('');
 
   const key = room ? `${room.round}:${room.problem.id}` : '';
@@ -89,76 +95,305 @@ export default function PlayerView({ session }: { session: RoomSession }) {
   const run = async () => {
     if (!active || running) return;
     setRunning(true);
+    soundFx.playThump();
     const r = await engine.runTests(code, room.problem.test_cases);
     setResult(r);
     sendProgress(r.passed, r.total, r.error);
     setRunning(false);
+
+    if (r.passed > (myPlayer?.passed ?? 0)) {
+      soundFx.playPass();
+    } else if (r.error || r.passed < r.total) {
+      soundFx.playFail();
+    }
+  };
+
+  const handleResetBuggyCode = () => {
+    if (window.confirm('Reset code back to original buggy version?')) {
+      setCode(room.problem.buggy_code);
+      setResult(null);
+      soundFx.playThump();
+    }
   };
 
   const Me = mySlot === 'player_2' ? DoodlePlayer2 : DoodlePlayer1;
+  const Opp = mySlot === 'player_2' ? DoodlePlayer1 : DoodlePlayer2;
+
+  const myPct = total > 0 ? Math.round(((myPlayer?.passed ?? 0) / total) * 100) : 0;
+  const oppPct = total > 0 ? Math.round(((opponent?.passed ?? 0) / total) * 100) : 0;
 
   return (
-    <div className="h-dvh w-screen overflow-hidden grid grid-rows-[auto_1fr] bg-paper text-black">
-      <header className="bb flex items-stretch text-xs sm:text-sm">
-        <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1 shrink-0">
-          <span className="font-heading font-extrabold text-base sm:text-lg">BUGARENA</span>
-          <DoodleBug size={20} />
+    <div className="h-dvh w-screen overflow-hidden flex flex-col bg-[#FAFAFA] text-black select-none">
+      {/* Top Header */}
+      <header className="border-b-2 border-black flex items-stretch text-xs sm:text-sm bg-white shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 shrink-0">
+          <span className="font-heading font-extrabold text-sm sm:text-lg">BUGARENA</span>
+          <DoodleBug size={18} className="shrink-0 sm:w-5 sm:h-5" />
         </div>
-        <div className="bl px-2.5 sm:px-3 py-1 flex items-center gap-1.5 shrink-0">
-          <Me size={24} className="shrink-0" />
-          <span className="font-bold truncate max-w-[90px] sm:max-w-none">
-            {myPlayer.name} {myPlayer.passed}/{total}
+
+        <div className="border-l-2 border-black px-2 sm:px-3 py-1 flex items-center gap-1.5 shrink-0 max-w-[130px] sm:max-w-none bg-paper">
+          <Me size={20} className="shrink-0 sm:w-6 sm:h-6" />
+          <span className="font-bold truncate text-[11px] sm:text-sm">
+            {myPlayer.name} ({myPlayer.passed}/{total})
           </span>
         </div>
-        <div className="bl px-2 sm:px-3 py-1 flex items-center gap-1.5 flex-1 min-w-0">
-          <span className="font-hand">vs</span>
-          <span className="font-bold truncate">
-            {opponent ? `${opponent.name} ${opponent.passed}/${total}` : 'waiting...'}
+
+        <div className="border-l-2 border-black px-2 sm:px-3 py-1 flex items-center gap-1.5 flex-1 min-w-0">
+          <span className="font-hand text-xs text-black/60">vs</span>
+          <Opp size={18} className="shrink-0 sm:w-5 sm:h-5 opacity-70" />
+          <span className="font-bold truncate text-[11px] sm:text-sm text-black/80">
+            {opponent ? `${opponent.name} (${opponent.passed}/${total})` : 'waiting for rival...'}
           </span>
         </div>
-        <div className="hidden sm:flex bl px-3 items-center font-bold shrink-0">ROOM {room.room_code}</div>
-        <div className="bl px-3 sm:px-4 flex items-center bg-black text-white font-bold text-sm sm:text-xl shrink-0">
+
+        <div className="border-l-2 border-black px-2 flex items-center shrink-0">
+          <SoundToggle />
+        </div>
+
+        <div className="hidden sm:flex border-l-2 border-black px-3 items-center font-mono font-bold shrink-0">
+          ROOM {room.room_code}
+        </div>
+
+        <div
+          className={`border-l-2 border-black px-3 sm:px-5 flex items-center font-heading font-extrabold text-sm sm:text-xl shrink-0 ${
+            active && secondsLeft <= 15 ? 'bg-black text-white animate-pulse' : active ? 'bg-black text-white' : 'bg-white'
+          }`}
+        >
           {formatClock(secondsLeft)}
         </div>
       </header>
 
-      <div className="grid grid-rows-[minmax(0,1.5fr)_minmax(0,2.5fr)] md:grid-rows-1 md:grid-cols-[minmax(280px,2fr)_3fr] min-h-0">
-        {/* Left: problem + console */}
-        <aside className="flex flex-col min-h-0 border-b-[1.5px] md:border-b-0 md:border-r-[1.5px] border-black">
-          <div className="bb p-3 overflow-y-auto max-h-[45%]">
-            <div className="font-hand text-xs text-black/70">ROUND {room.round}</div>
-            <h2 className="font-display italic text-xl sm:text-2xl leading-tight">{room.problem.title}</h2>
-            <p className="text-xs mt-1 whitespace-pre-wrap">{room.problem.description}</p>
-            <p className="font-hand text-xs mt-2 text-black/80">There is exactly one bug. Find it, fix it.</p>
+      {/* Adrenaline Opponent Drag-Strip Race Track */}
+      <div className="border-b-2 border-black bg-white px-3 sm:px-4 py-2 shrink-0 flex flex-col gap-1.5 shadow-[0px_2px_0px_#000]">
+        <div className="flex items-center justify-between text-[11px] font-bold">
+          <div className="flex items-center gap-1">
+            <span className="font-mono">⚡ LIVE RACE TRACK</span>
+            <span className="font-hand text-black/60 text-xs hidden sm:inline">(first to pass all tests wins)</span>
           </div>
-          <div className="bb px-3 py-1.5 flex justify-between items-center text-xs font-bold bg-[#f3f3f3]">
-            <span>TEST CONSOLE</span>
-            <span>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] sm:text-xs">
+              YOU: <span className="font-mono font-bold">{myPlayer.passed}/{total}</span>
+            </span>
+            <span className="text-[10px] sm:text-xs text-black/70">
+              RIVAL: <span className="font-mono font-bold">{opponent?.passed ?? 0}/{total}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 2-Lane Sprint Tracks */}
+        <div className="grid grid-cols-1 gap-1">
+          {/* Lane 1: You */}
+          <div className="relative border border-black h-4 bg-paper flex items-center overflow-hidden">
+            <div
+              className="h-full bg-black transition-all duration-300 ease-out"
+              style={{ width: `${myPct}%` }}
+            />
+            <div
+              className="absolute top-0 bottom-0 flex items-center transition-all duration-300"
+              style={{ left: `calc(${Math.min(myPct, 95)}% - 6px)` }}
+            >
+              <span className="text-xs">🏃</span>
+            </div>
+            <span className="absolute right-1 text-[9px] font-bold font-mono text-black/70">
+              [🏁 FINISH]
+            </span>
+          </div>
+
+          {/* Lane 2: Opponent */}
+          <div className="relative border border-black h-4 bg-paper flex items-center overflow-hidden">
+            <div
+              className="h-full hatch transition-all duration-300 ease-out"
+              style={{ width: `${oppPct}%` }}
+            />
+            <div
+              className="absolute top-0 bottom-0 flex items-center transition-all duration-300"
+              style={{ left: `calc(${Math.min(oppPct, 95)}% - 6px)` }}
+            >
+              <span className="text-xs opacity-75">👾</span>
+            </div>
+            <span className="absolute right-1 text-[9px] font-bold font-mono text-black/70">
+              [🏁 FINISH]
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Tab Bar */}
+      <div className="md:hidden grid grid-cols-2 border-b-2 border-black bg-[#f0f0f0] text-xs font-bold shrink-0">
+        <button
+          type="button"
+          onClick={() => setMobileTab('editor')}
+          className={`py-2 px-3 flex items-center justify-center gap-1.5 border-r border-black cursor-pointer transition-colors ${
+            mobileTab === 'editor' ? 'bg-black text-white' : 'bg-white text-black'
+          }`}
+        >
+          <span>💻 CODE EDITOR</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('problem')}
+          className={`py-2 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+            mobileTab === 'problem' ? 'bg-black text-white' : 'bg-white text-black'
+          }`}
+        >
+          <span>📋 PROBLEM & TESTS</span>
+          <span
+            className={`px-1.5 py-0.5 text-[10px] font-bold ${
+              mobileTab === 'problem' ? 'bg-white text-black' : 'bg-black text-white'
+            }`}
+          >
+            {result ? `${result.passed}/${result.total}` : `${myPlayer.passed}/${total}`}
+          </span>
+        </button>
+      </div>
+
+      {/* Main Split: Left (Problem + Test Cards), Right (Monaco + Controls) */}
+      <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[minmax(300px,2fr)_3fr]">
+        {/* Left: Problem & Test Verification Cards */}
+        <aside
+          className={`flex-col min-h-0 border-b-2 md:border-b-0 md:border-r-2 border-black bg-[#FAFAFA] ${
+            mobileTab === 'problem' ? 'flex flex-1' : 'hidden md:flex'
+          }`}
+        >
+          {/* Problem Brief */}
+          <div className="border-b-2 border-black p-3 sm:p-4 overflow-y-auto max-h-[40%] bg-white">
+            <div className="flex items-center justify-between">
+              <span className="font-hand text-xs text-black/70">ROUND {room.round} CHALLENGE</span>
+              <button
+                type="button"
+                onClick={handleResetBuggyCode}
+                className="font-hand text-[11px] text-black/70 hover:text-black underline cursor-pointer"
+              >
+                ↺ revert to original bug
+              </button>
+            </div>
+            <h2 className="font-heading font-extrabold text-lg sm:text-2xl leading-tight mt-0.5">
+              {room.problem.title}
+            </h2>
+            <p className="text-xs mt-1.5 whitespace-pre-wrap leading-relaxed text-black/90">
+              {room.problem.description}
+            </p>
+            <p className="font-hand text-xs mt-2 text-black/80 font-bold">
+              There is exactly one bug. Find it, fix it, squash it.
+            </p>
+          </div>
+
+          {/* Test Console Header */}
+          <div className="border-b-2 border-black px-3 py-2 flex justify-between items-center text-xs font-bold bg-[#f3f3f3]">
+            <span>TEST VERIFICATION CARDS</span>
+            <span className="border border-black px-2 py-0.5 bg-white font-mono">
               {result ? `${result.passed}/${result.total}` : `0/${total}`} PASSED
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto text-xs">
-            {!result && <div className="p-3 font-hand text-black/60">Hit RUN TESTS to see results.</div>}
+
+          {/* Test Cards List with Expandable Accordions */}
+          <div className="flex-1 overflow-y-auto text-xs p-2 space-y-1.5 bg-[#FAFAFA]">
+            {!result && (
+              <div className="p-4 font-hand text-black/60 flex flex-col gap-1 text-center">
+                <span>Press [ RUN TESTS ] or Ctrl + Enter to test your code.</span>
+              </div>
+            )}
+
             {result?.error && (
-              <div className="p-3 bb bg-black text-white whitespace-pre-wrap break-words">[!] {result.error}</div>
+              <div className="border-2 border-black bg-black text-white p-3 whitespace-pre-wrap break-words font-mono text-[11px] shadow-[2px_2px_0px_#000]">
+                <div className="font-bold mb-1 text-red-400">RUNTIME ERROR:</div>
+                {result.error}
+              </div>
             )}
-            {(result?.results.length ? result.results : room.problem.test_cases.map((t) => ({ name: t.name, passed: null as boolean | null, error: null as string | null }))).map(
-              (t, i) => (
-                <div key={i} className="bb px-3 py-1.5 flex justify-between gap-2">
-                  <span className="truncate">
-                    {t.passed === null ? '[ ]' : t.passed ? '[x]' : '[!]'} {t.name}
-                  </span>
-                  <span className={`font-bold shrink-0 ${t.passed ? 'text-black' : t.passed === false ? 'text-red-600' : ''}`}>
-                    {t.passed === null ? '' : t.passed ? 'PASS' : 'FAIL'}
-                  </span>
+
+            {room.problem.test_cases.map((t, i) => {
+              const res = result?.results[i];
+              const isPassed = res?.passed;
+              const isExpanded = expandedTest === i;
+
+              return (
+                <div
+                  key={i}
+                  className={`border-2 border-black bg-white transition-all ${
+                    isPassed === true
+                      ? 'border-black'
+                      : isPassed === false
+                        ? 'border-red-600 bg-red-50/20'
+                        : 'border-black/50'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setExpandedTest(isExpanded ? null : i)}
+                    className="w-full px-3 py-2 flex items-center justify-between text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`text-xs font-bold px-1.5 py-0.5 ${
+                          isPassed === true
+                            ? 'bg-black text-white'
+                            : isPassed === false
+                              ? 'bg-red-600 text-white'
+                              : 'bg-black/10 text-black'
+                        }`}
+                      >
+                        {isPassed === true ? '✓ PASS' : isPassed === false ? '✗ FAIL' : '· WAIT'}
+                      </span>
+                      <span className="font-bold truncate text-xs">{t.name}</span>
+                    </div>
+                    <span className="text-[11px] font-hand text-black/60 shrink-0 ml-2">
+                      {isExpanded ? 'hide ▲' : 'inspect ▼'}
+                    </span>
+                  </button>
+
+                  {/* Expandable Test Case Details Accordion */}
+                  {isExpanded && (
+                    <div className="border-t border-black p-2.5 bg-paper font-mono text-[11px] flex flex-col gap-1">
+                      <div className="text-black/70 font-bold">ASSERTION:</div>
+                      <pre className="bg-white border border-black/40 p-1.5 overflow-x-auto whitespace-pre-wrap">
+                        {t.code}
+                      </pre>
+                      {res?.error && (
+                        <div className="text-red-600 font-bold mt-1">
+                          FAILED: {res.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ),
-            )}
+              );
+            })}
+          </div>
+
+          {/* Quick mobile switch back */}
+          <div className="border-t-2 border-black p-2 bg-white flex items-center justify-between md:hidden shrink-0">
+            <span className="font-hand text-xs text-black/70">Ready to edit?</span>
+            <button
+              type="button"
+              onClick={() => setMobileTab('editor')}
+              className="btn-ink px-4 py-2 text-xs font-bold cursor-pointer"
+            >
+              BACK TO CODE →
+            </button>
           </div>
         </aside>
 
-        {/* Right: editor */}
-        <section className="flex flex-col min-h-0 relative">
+        {/* Right: Monaco Editor & Action Toolbar */}
+        <section
+          className={`flex-col min-h-0 relative ${
+            mobileTab === 'editor' ? 'flex flex-1' : 'hidden md:flex'
+          }`}
+        >
+          {/* Editor Header Bar with Reset Button */}
+          <div className="border-b border-black px-3 py-1.5 bg-white flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">solution.py</span>
+              <span className="text-[10px] text-black/60 font-mono">Python 3.10 (WASM)</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetBuggyCode}
+              className="font-hand text-xs text-black/70 hover:text-black underline cursor-pointer"
+            >
+              [ ↺ RESET TO BUG ]
+            </button>
+          </div>
+
           <div className="flex-1 min-h-0">
             <Editor
               height="100%"
@@ -167,6 +402,9 @@ export default function PlayerView({ session }: { session: RoomSession }) {
               beforeMount={defineTheme}
               value={code}
               onChange={(v) => setCode(v ?? '')}
+              onMount={(editor) => {
+                editor.addCommand(2048 | 3, run); // Ctrl/Cmd + Enter
+              }}
               options={{
                 readOnly: !active,
                 fontFamily: "'Space Mono', monospace",
@@ -180,46 +418,63 @@ export default function PlayerView({ session }: { session: RoomSession }) {
               }}
             />
           </div>
-          <div className="bt flex items-stretch">
-            <div className="flex-1 px-3 flex items-center text-xs font-bold">
-              ENGINE: {engine.status === 'ready' ? 'READY' : engine.status === 'loading' ? 'LOADING...' : 'ERROR'}
+
+          {/* Bottom Execution Bar */}
+          <div className="border-t-2 border-black flex items-stretch bg-white">
+            <div className="flex-1 px-3 flex items-center gap-2 text-xs font-bold truncate">
+              <span className="hidden sm:inline text-black/70">HOTKEY:</span>
+              <kbd className="border border-black px-1.5 py-0.5 text-[10px] bg-paper shadow-[1px_1px_0px_#000]">
+                ⌘ / Ctrl + Enter
+              </kbd>
             </div>
+
             {active && <InkArrow width={55} className="hidden sm:block self-center mr-1" />}
+
             <button
               onClick={run}
               disabled={!active || running || !engine.isReady}
-              className="btn-ink px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm"
+              className="btn-ink px-6 sm:px-8 py-3 text-xs sm:text-sm shrink-0 cursor-pointer shadow-[3px_3px_0px_#000]"
             >
-              {running ? 'RUNNING...' : 'RUN TESTS'}
+              {running ? 'TESTING...' : 'RUN TESTS →'}
             </button>
           </div>
 
+          {/* Lobby Waiting Overlay */}
           {!active && !finished && (
-            <div className="absolute inset-0 bg-paper/90 flex flex-col items-center justify-center text-center gap-2 p-4">
-              <div className="font-display italic text-3xl sm:text-4xl">Waiting for opponent</div>
-              <div className="font-hand text-xs sm:text-sm">Duel starts automatically when 2 players are in (or host starts it).</div>
-              <div className="font-bold text-sm blink">...</div>
+            <div className="absolute inset-0 bg-[#FAFAFA]/90 flex flex-col items-center justify-center text-center gap-2 p-4 z-20">
+              <div className="font-display italic text-3xl sm:text-5xl">Waiting for opponent</div>
+              <div className="font-hand text-xs sm:text-sm">
+                Duel starts automatically when 2 players are in (or host starts it).
+              </div>
+              <div className="font-bold text-sm blink mt-1">● ● ●</div>
             </div>
           )}
 
+          {/* Match Finished Overlay */}
           {finished && (
-            <div className="absolute inset-0 bg-paper/95 overflow-y-auto flex flex-col items-center justify-center text-center gap-3 p-4">
-              <div className="font-display italic text-4xl sm:text-6xl">
-                {room.winner ? (iWon ? 'You win!' : 'You lose') : 'Draw'}
+            <div className="absolute inset-0 bg-[#FAFAFA]/95 overflow-y-auto flex flex-col items-center justify-start sm:justify-center text-center gap-3 p-4 sm:p-6 z-20 border-2 border-black m-2 shadow-[6px_6px_0px_#000]">
+              <div className="font-display italic text-5xl sm:text-7xl leading-none">
+                {room.winner ? (iWon ? '🎉 YOU WIN!' : '💀 YOU LOSE') : '🤝 DRAW'}
               </div>
-              <div className="font-hand text-xs sm:text-sm">
+              <div className="font-hand text-xs sm:text-sm font-bold">
                 {room.winner
-                  ? `${room.winner.name} ${room.finish_reason === 'timeout' ? 'led at time-up' : 'fixed it'} (${room.winner.passed}/${room.winner.total})`
-                  : 'Nobody cracked it.'}
+                  ? `${room.winner.name} ${room.finish_reason === 'timeout' ? 'led at time-up' : 'fixed all bugs'} (${room.winner.passed}/${room.winner.total})`
+                  : 'Nobody squashed the bug in time.'}
               </div>
               {room.problem.description_bug && (
-                <div className="b p-3 text-xs max-w-lg text-left bg-white">
-                  <div className="font-bold">THE BUG</div>
-                  {room.problem.description_bug}
-                  {room.problem.diff && <pre className="mt-2 whitespace-pre-wrap font-mono">{room.problem.diff}</pre>}
+                <div className="border-2 border-black p-3 text-xs max-w-lg text-left bg-white shadow-[2px_2px_0px_#000]">
+                  <div className="font-bold mb-1">THE BUG INJECTED:</div>
+                  <div className="mb-2">{room.problem.description_bug}</div>
+                  {room.problem.diff && (
+                    <pre className="p-2 border border-black/40 bg-paper whitespace-pre-wrap font-mono text-[11px] overflow-x-auto">
+                      {room.problem.diff}
+                    </pre>
+                  )}
                 </div>
               )}
-              <div className="font-hand text-xs sm:text-sm">Waiting for host to start the next round...</div>
+              <div className="font-hand text-xs sm:text-sm text-black/70">
+                Waiting for host to launch the next round...
+              </div>
             </div>
           )}
         </section>

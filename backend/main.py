@@ -155,6 +155,14 @@ async def websocket_endpoint(
             elif event_type == "START_NEXT_ROUND":
                 await room_manager.start_next_round(room_code_upper)
 
+            elif event_type == "EMOTE_REACTION":
+                emote = data.get("emote")
+                if emote:
+                    await room_manager.broadcast_event(
+                        room_code_upper,
+                        {"type": "EMOTE_REACTION", "emote": emote, "sender": client_id}
+                    )
+
     except WebSocketDisconnect:
         logger.info(f"Client {client_id} disconnected from {room_code_upper}")
         await room_manager.disconnect(room_code_upper, client_id, websocket)

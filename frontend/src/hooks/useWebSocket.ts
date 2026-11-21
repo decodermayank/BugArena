@@ -33,6 +33,7 @@ export function useWebSocket({ roomCode, role, nickname = '' }: Options) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState<number>(Date.now());
+  const [lastEmote, setLastEmote] = useState<{ emote: string; sender: string; timestamp: number } | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const clientId = useRef(getClientId()).current;
 
@@ -61,6 +62,8 @@ export function useWebSocket({ roomCode, role, nickname = '' }: Options) {
           if (data.type === 'ROOM_STATE') {
             setRoomState(data);
             setReceivedAt(Date.now());
+          } else if (data.type === 'EMOTE_REACTION') {
+            setLastEmote({ emote: data.emote, sender: data.sender, timestamp: Date.now() });
           } else if (data.type === 'ERROR') {
             fatal = true;
             setError(data.message);
@@ -128,6 +131,8 @@ export function useWebSocket({ roomCode, role, nickname = '' }: Options) {
     mySlot,
     opponent,
     secondsLeft: Math.ceil(secondsLeft),
+    lastEmote,
+    sendEmote: (emote: string) => send({ type: 'EMOTE_REACTION', emote }),
     startMatch: () => send({ type: 'START_MATCH' }),
     startNextRound: () => send({ type: 'START_NEXT_ROUND' }),
     sendProgress: (passed: number, total: number, err: string | null) =>
