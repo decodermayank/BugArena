@@ -194,9 +194,9 @@ export default function PlayerView({ session }: { session: RoomSession }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Live Clock Badge in Track Bar */}
+            {/* Live Clock Badge in Track Bar (desktop) */}
             <div
-              className={`px-1.5 sm:px-2 py-0.5 border border-black font-mono font-bold text-[10px] sm:text-xs flex items-center gap-1 shadow-[1px_1px_0px_#000] ${
+              className={`hidden sm:flex px-1.5 sm:px-2 py-0.5 border border-black font-mono font-bold text-[10px] sm:text-xs items-center gap-1 shadow-[1px_1px_0px_#000] ${
                 active && secondsLeft <= 15
                   ? 'bg-red-600 text-white animate-pulse'
                   : active && secondsLeft <= 30

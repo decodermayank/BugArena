@@ -9,8 +9,8 @@ import { CursorToggle } from '../components/CustomCursor';
 import { soundFx } from '../utils/soundFx';
 
 const BUG_OPTIONS: { id: BugCategory; label: string; hint: string }[] = [
-  { id: 'off_by_one', label: 'OFF-BY-ONE', hint: 'range() / index slips by 1' },
-  { id: 'inverted_condition', label: 'INVERTED LOGIC', hint: 'if flips to if not' },
+  { id: 'off_by_one', label: 'OFF-BY-ONE', hint: 'range() / index slip by 1' },
+  { id: 'inverted_condition', label: 'INVERTED LOGIC', hint: 'flipped if / while condition' },
   { id: 'arithmetic', label: 'BROKEN MATH', hint: '+ becomes -, * becomes //' },
 ];
 
@@ -22,13 +22,14 @@ const REACTION_EMOTES = [
 ];
 
 function Bar({ passed, total }: { passed: number; total: number }) {
+  const safeTotal = Math.max(total, 1);
   return (
-    <div className="flex gap-0 border-2 border-black h-5 w-full bg-paper shadow-[1px_1px_0px_#000]">
-      {Array.from({ length: Math.max(total, 1) }).map((_, i) => (
+    <div className="flex gap-0 border-2 border-black h-4 w-full bg-paper shadow-[1px_1px_0px_#000] overflow-hidden">
+      {Array.from({ length: safeTotal }).map((_, i) => (
         <div
           key={i}
           className={`flex-1 transition-all duration-300 ${i < passed ? 'bg-black' : 'bg-paper'} ${
-            i > 0 ? 'border-l-2 border-black' : ''
+            i > 0 ? 'border-l border-black' : ''
           }`}
         />
       ))}
@@ -44,6 +45,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
 
   const [activeTab, setActiveTab] = useState<'betting' | 'question'>('betting');
   const [codeExpanded, setCodeExpanded] = useState<boolean>(true);
+  const [copiedCode, setCopiedCode] = useState<boolean>(false);
 
   const [predictedWinner, setPredictedWinner] = useState<PlayerSlot | null>(() => {
     return (sessionStorage.getItem(`ba_w_${roomCode}_${round}`) as PlayerSlot) || null;
@@ -70,6 +72,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
   const a = room.predictions?.player_1 ?? 0;
   const b = room.predictions?.player_2 ?? 0;
   const aPct = a + b === 0 ? 50 : Math.round((a / (a + b)) * 100);
+  const totalTests = room.problem?.test_cases?.length || 5;
 
   const bugGuesses = room.bug_guesses || { off_by_one: 0, inverted_condition: 0, arithmetic: 0 };
   const totalBugGuesses = Object.values(bugGuesses).reduce((x, y) => x + y, 0);
@@ -101,6 +104,14 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
     voteNextBug(cat);
   };
 
+  const handleCopyCode = () => {
+    if (!room.problem?.buggy_code) return;
+    navigator.clipboard.writeText(room.problem.buggy_code);
+    setCopiedCode(true);
+    soundFx.playThump();
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
   const handleSpamReaction = (icon: string) => {
     soundFx.playEmotePop();
     setActiveReaction(icon);
@@ -118,10 +129,10 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
 
   return (
     <div className="min-h-dvh bg-[#FAFAFA] text-black border-x-0 sm:border-x-2 border-black max-w-xl mx-auto flex flex-col relative overflow-x-hidden select-none pb-24">
-      {/* Top Header */}
-      <header className="border-b-2 border-black flex items-stretch justify-between bg-white">
+      {/* 1. TOP HEADER (CLEAN, NO CONGESTION) */}
+      <header className="border-b-2 border-black bg-white flex items-stretch justify-between shrink-0 sticky top-0 z-40">
+        {/* Left: Back to Home + Arena Title */}
         <div className="flex items-stretch min-w-0">
-          {/* Back Button to Home Page */}
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -132,73 +143,97 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
             <span className="font-mono text-[11px] sm:text-xs">HOME</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 cursor-pointer hover:bg-black/5 transition-colors text-left"
-            title="BugArena Home"
-          >
-            <span className="font-heading font-extrabold text-sm sm:text-lg">BUGARENA</span>
-            <DoodleBug size={18} className="shrink-0 sm:w-5 sm:h-5" />
-            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-black text-white">CROWD</span>
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 min-w-0">
+            <span className="font-heading font-extrabold text-sm sm:text-base tracking-tight truncate">
+              BUGARENA
+            </span>
+            <DoodleBug size={16} className="shrink-0 sm:w-5 sm:h-5 hidden xs:block" />
+            <span className="border border-black px-1.5 py-0.5 font-mono text-[10px] sm:text-xs font-bold bg-paper shrink-0">
+              {room.room_code}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center">
-          <div className="flex items-center gap-1.5 mr-2">
+        {/* Right: Sound, Cursor, and Countdown Timer */}
+        <div className="flex items-stretch shrink-0">
+          <div className="flex items-center gap-1 px-1.5 sm:px-2 border-l-2 border-black">
             <SoundToggle />
             <CursorToggle />
           </div>
-          <div className="border-l-2 border-black px-3 py-2 flex items-center font-mono font-bold text-xs sm:text-sm">
-            ROOM {room.room_code}
+
+          {/* Prominent Live Countdown Timer */}
+          <div
+            className={`border-l-2 border-black px-2.5 sm:px-3.5 flex items-center gap-1 font-mono font-extrabold text-xs sm:text-sm tabular-nums select-none ${
+              room.status === 'ACTIVE' && secondsLeft <= 15
+                ? 'bg-red-600 text-white animate-pulse'
+                : room.status === 'ACTIVE' && secondsLeft <= 30
+                  ? 'bg-[#CCFF00] text-black font-extrabold'
+                  : room.status === 'ACTIVE'
+                    ? 'bg-black text-white'
+                    : 'bg-paper text-black'
+            }`}
+            title={`Time remaining: ${formatClock(secondsLeft)}`}
+          >
+            <span>⏱</span>
+            <span>{formatClock(secondsLeft)}</span>
           </div>
         </div>
       </header>
 
-      {/* Status Bar */}
-      <div className="grid grid-cols-3 border-b-2 border-black text-center bg-paper">
-        <div className="border-r-2 border-black py-2">
-          <div className="font-hand text-[10px] sm:text-xs text-black/70">STATUS</div>
-          <div className="font-bold text-xs sm:text-sm">{room.status}</div>
+      {/* 2. MATCH CONTEXT SUB-STRIP (ROUND • TITLE • STATUS) */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b-2 border-black bg-paper text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-bold text-[10px] sm:text-xs px-1.5 py-0.5 bg-black text-white font-mono">
+            R#{room.round}
+          </span>
+          <span className="font-heading font-extrabold text-xs sm:text-sm text-black truncate">
+            {room.problem.title}
+          </span>
         </div>
-        <div className="border-r-2 border-black py-2">
-          <div className="font-hand text-[10px] sm:text-xs text-black/70">TIME</div>
-          <div className={`font-mono font-extrabold text-xs sm:text-sm ${secondsLeft <= 15 ? 'text-red-600 animate-pulse' : ''}`}>
-            ⏱ {formatClock(secondsLeft)}
-          </div>
-        </div>
-        <div className="py-2">
-          <div className="font-hand text-[10px] sm:text-xs text-black/70">ROUND</div>
-          <div className="font-bold text-xs sm:text-sm">#{room.round}</div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 border border-black ${
+              room.status === 'ACTIVE'
+                ? 'bg-[#CCFF00] text-black'
+                : room.status === 'FINISHED'
+                  ? 'bg-black text-white'
+                  : 'bg-white text-black'
+            }`}
+          >
+            {room.status === 'ACTIVE' ? 'LIVE' : room.status}
+          </span>
+          <span className="text-[10px] sm:text-[11px] font-mono text-black/60">
+            👥 {room.spectator_count ?? 1}
+          </span>
         </div>
       </div>
 
-      {/* Navigation Tabs (Mobile & Desktop Friendly) */}
-      <div className="grid grid-cols-2 border-b-2 border-black bg-[#f0f0f0] text-xs font-bold shrink-0 sticky top-0 z-30 shadow-[0_2px_0_#000]">
+      {/* 3. NAVIGATION TABS (BETTING vs QUESTION) */}
+      <div className="grid grid-cols-2 border-b-2 border-black bg-white text-xs font-bold shrink-0 sticky top-[41px] z-30 shadow-[0_1px_0_#000]">
         <button
           type="button"
           onClick={() => setActiveTab('betting')}
-          className={`py-2.5 px-3 flex items-center justify-center gap-1.5 border-r border-black cursor-pointer transition-colors ${
-            activeTab === 'betting' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/10'
+          className={`py-2 px-3 flex items-center justify-center gap-1.5 border-r border-black cursor-pointer transition-colors ${
+            activeTab === 'betting' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/5'
           }`}
         >
-          <span>🎯 PREDICTIONS & BETS</span>
+          <span>🎯 DUEL & BETS</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('question')}
-          className={`py-2.5 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-            activeTab === 'question' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/10'
+          className={`py-2 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+            activeTab === 'question' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/5'
           }`}
         >
-          <span>📋 VIEW QUESTION & CODE</span>
+          <span>📋 QUESTION & CODE</span>
           <span className="w-2 h-2 rounded-full bg-[#CCFF00] inline-block" />
         </button>
       </div>
 
-      {/* TAB 1: CHALLENGE QUESTION & BUGGY CODE (WHAT CHALLENGERS SEE) */}
+      {/* 4. TAB 1: QUESTION & CODE (INSPECT WHAT PLAYERS ARE SOLVING) */}
       {activeTab === 'question' && (
-        <section className="flex flex-col gap-3 p-3.5 bg-[#FAFAFA] animate-in fade-in duration-200">
+        <section className="flex flex-col gap-3 p-3 sm:p-4 bg-[#FAFAFA] animate-in fade-in duration-200">
           {/* Question Brief */}
           <div className="border-2 border-black bg-white p-3.5 sm:p-4 shadow-[2px_2px_0px_#000]">
             <div className="flex items-center justify-between">
@@ -215,26 +250,36 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
             </div>
             <div className="mt-2 text-xs font-hand text-black/80 flex items-center gap-1.5">
               <span>💡</span>
-              <span className="font-bold">Goal: Challengers are looking for 1 mutated bug in this code.</span>
+              <span className="font-bold">Goal: Challengers must find & fix 1 mutated bug in this code.</span>
             </div>
           </div>
 
-          {/* Buggy Code Inspector (Exact code challenger sees in Monaco Editor) */}
+          {/* Buggy Code Inspector */}
           <div className="border-2 border-black bg-white shadow-[2px_2px_0px_#000]">
             <div className="border-b-2 border-black px-3 py-2 bg-black text-white flex justify-between items-center text-xs font-bold">
               <span className="flex items-center gap-1.5">
                 <span>💻 BUGGY CODE BEING SOLVED</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setCodeExpanded(!codeExpanded)}
-                className="font-hand text-[11px] text-[#CCFF00] hover:underline cursor-pointer"
-              >
-                {codeExpanded ? 'hide code ▲' : 'show code ▼'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="font-mono text-[10px] px-1.5 py-0.5 bg-white text-black border border-black hover:bg-[#CCFF00] cursor-pointer"
+                  title="Copy buggy Python code"
+                >
+                  {copiedCode ? 'COPIED!' : 'COPY'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCodeExpanded(!codeExpanded)}
+                  className="font-hand text-[11px] text-[#CCFF00] hover:underline cursor-pointer"
+                >
+                  {codeExpanded ? 'hide ▲' : 'show ▼'}
+                </button>
+              </div>
             </div>
             {codeExpanded && (
-              <div className="p-3 bg-paper font-mono text-xs overflow-x-auto">
+              <div className="p-3 bg-paper font-mono text-xs overflow-x-auto max-w-full">
                 <pre className="text-black leading-relaxed whitespace-pre font-mono">
                   {room.problem.buggy_code}
                 </pre>
@@ -271,70 +316,42 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
             </div>
           </div>
 
-          {/* Quick jump to predictions */}
+          {/* Quick jump back to betting */}
           <button
             type="button"
             onClick={() => setActiveTab('betting')}
-            className="btn-ink w-full py-3 text-sm font-bold tracking-wider cursor-pointer shadow-[3px_3px_0px_#000]"
+            className="btn-ink w-full py-2.5 text-xs sm:text-sm font-bold tracking-wider cursor-pointer shadow-[2px_2px_0px_#000]"
           >
             🎯 GO TO CROWD PREDICTIONS & BETTING →
           </button>
         </section>
       )}
 
-      {/* TAB 2: ARENA, PREDICTIONS & BETS */}
+      {/* 5. TAB 2: ARENA & BETS (UNIFIED, NON-CONGESTED) */}
       {activeTab === 'betting' && (
-        <>
-          {/* Quick Problem Peek Banner */}
-          <div className="border-b-2 border-black bg-white p-3 flex flex-col gap-1 shadow-[0_1px_0_#000]">
-            <div className="flex items-center justify-between">
-              <span className="font-hand text-[11px] text-black/70">ACTIVE CHALLENGE</span>
-              <button
-                type="button"
-                onClick={() => setActiveTab('question')}
-                className="text-[10px] font-bold px-2 py-0.5 border border-black bg-[#CCFF00] text-black hover:bg-black hover:text-white transition-colors cursor-pointer shadow-[1px_1px_0px_#000]"
-              >
-                VIEW QUESTION & CODE →
-              </button>
-            </div>
-            <div className="font-heading font-extrabold text-sm sm:text-base text-black">
-              {room.problem.title}
-            </div>
-            <p className="text-xs text-black/75 line-clamp-2 leading-relaxed">
-              {room.problem.description}
-            </p>
+        <div className="flex flex-col gap-3 p-3 sm:p-4 animate-in fade-in duration-200">
+          {/* Quick Problem Link Helper */}
+          <div className="flex items-center justify-between text-xs text-black/75 px-0.5">
+            <span className="font-hand text-xs truncate max-w-[200px] sm:max-w-xs">
+              Challenge: <span className="font-bold text-black">{room.problem.title}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setActiveTab('question')}
+              className="text-[11px] font-bold text-black underline hover:text-black/70 cursor-pointer shrink-0 ml-2"
+            >
+              Inspect Code & Tests ↗
+            </button>
           </div>
 
-          {/* Live Duelists Progress */}
-          <section className="border-b-2 border-black p-3.5 flex flex-col gap-3 bg-white">
-            <div className="flex items-center justify-between text-xs font-bold text-black/70">
-              <span className="font-heading font-extrabold text-xs tracking-wider">LIVE CHALLENGERS</span>
-              <span className="font-mono">{room.problem.title}</span>
-            </div>
-            {[p1, p2].map((p, i) => (
-              <div key={i} className="flex items-center gap-2.5 sm:gap-3">
-                <div className="border border-black p-0.5 bg-paper shrink-0">
-                  {i === 0 ? <DoodlePlayer1 size={36} /> : <DoodlePlayer2 size={36} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-xs font-bold mb-1">
-                    <span className="truncate">{p ? p.name : `PLAYER ${i + 1}: waiting...`}</span>
-                    <span className="ml-2 shrink-0 font-mono">
-                      {p ? `${p.passed}/${p.total}` : '-'}
-                    </span>
-                  </div>
-                  <Bar passed={p?.passed ?? 0} total={p?.total ?? room.problem.test_cases.length} />
-                </div>
-              </div>
-            ))}
-          </section>
-
-          {/* END-OF-ROUND FINISHED RESULTS & LEADERBOARD */}
+          {/* ROUND COMPLETED CELEBRATION & LEADERBOARD (IF FINISHED) */}
           {room.status === 'FINISHED' && (
-            <section className="border-b-2 border-black bg-white flex flex-col shadow-[2px_2px_0px_#000]">
-              <div className="bg-black text-white p-4 text-center">
-                <div className="font-hand text-xs text-[#CCFF00] tracking-widest uppercase">ROUND {room.round} COMPLETED</div>
-                <div className="font-display italic text-3xl sm:text-4xl mt-1">
+            <section className="border-2 border-black bg-white flex flex-col shadow-[2px_2px_0px_#000]">
+              <div className="bg-black text-white p-3 sm:p-4 text-center">
+                <div className="font-hand text-xs text-[#CCFF00] tracking-widest uppercase">
+                  ROUND {room.round} COMPLETED
+                </div>
+                <div className="font-display italic text-2xl sm:text-3xl mt-1">
                   {room.winner ? `${room.winner.name} wins!` : 'Stalemate / Draw!'}
                 </div>
                 {room.winner && (
@@ -346,11 +363,11 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
 
               {/* Crowd Callout Box */}
               {room.crowd_callout && (
-                <div className="bg-[#CCFF00] border-b-2 border-black p-3 text-center">
-                  <div className="font-heading font-extrabold text-sm sm:text-base leading-tight uppercase">
+                <div className="bg-[#CCFF00] border-b-2 border-black p-2.5 text-center">
+                  <div className="font-heading font-extrabold text-xs sm:text-sm leading-tight uppercase">
                     ⚡ {room.crowd_callout.headline}
                   </div>
-                  <div className="font-hand text-xs text-black/80 mt-0.5">
+                  <div className="font-hand text-[11px] text-black/80 mt-0.5">
                     {room.crowd_callout.subtitle}
                   </div>
                 </div>
@@ -367,12 +384,14 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
                     room.leaderboard.map((entry, idx) => (
                       <div key={entry.id || idx} className="flex justify-between items-center px-2.5 py-1.5 text-xs font-bold">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className={`w-5 h-5 flex items-center justify-center border border-black text-[10px] shrink-0 ${
-                            idx === 0 ? 'bg-[#CCFF00] text-black font-extrabold' : 'bg-paper text-black'
-                          }`}>
+                          <span
+                            className={`w-5 h-5 flex items-center justify-center border border-black text-[10px] shrink-0 ${
+                              idx === 0 ? 'bg-[#CCFF00] text-black font-extrabold' : 'bg-paper text-black'
+                            }`}
+                          >
                             #{idx + 1}
                           </span>
-                          <span className="truncate max-w-[150px]">{entry.name}</span>
+                          <span className="truncate max-w-[140px] sm:max-w-[200px]">{entry.name}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {entry.round_points > 0 && (
@@ -386,101 +405,157 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
                     ))
                   ) : (
                     <div className="p-3 text-center font-hand text-xs text-black/60">
-                      No predictions recorded.
+                      No predictions recorded yet.
                     </div>
                   )}
                 </div>
               </div>
-
-              {/* Action to leave or return to home */}
-              <div className="p-3 pt-0">
-                <button
-                  type="button"
-                  onClick={() => navigate('/')}
-                  className="btn-paper w-full py-2.5 text-xs font-bold hover:bg-black hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000]"
-                >
-                  <span>← LEAVE ROOM & RETURN HOME</span>
-                </button>
-              </div>
             </section>
           )}
 
-          {/* 1. WINNER GUESS (+100 PTS) */}
-          <section className="border-b-2 border-black bg-white">
+          {/* UNIFIED 1. DUEL & WINNER BET CARD (NO REDUNDANCY!) */}
+          <section className="border-2 border-black bg-white shadow-[2px_2px_0px_#000]">
             <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
-              <div>
-                <span className="font-heading font-extrabold text-xs tracking-wider">1. GUESS THE WINNER</span>
-                <span className="ml-2 font-hand text-xs text-black/70">+100 PTS</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-heading font-extrabold text-xs tracking-wider">
+                  1. GUESS THE WINNER
+                </span>
+                <span className="font-hand text-[11px] text-black/70">+100 PTS</span>
               </div>
-              {predictedWinner && (
+              {predictedWinner ? (
                 <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shadow-[1px_1px_0px_#000]">
-                  LOCKED IN: {predictedWinner === 'player_1' ? (p1?.name || 'P1') : (p2?.name || 'P2')}
+                  PICK: {predictedWinner === 'player_1' ? (p1?.name || 'P1') : (p2?.name || 'P2')} ✓
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-black/60 hidden xs:inline">
+                  TAP FIGHTER TO BET
                 </span>
               )}
             </div>
 
+            {/* Duelists: 2 Interactive Cards */}
             <div className="grid grid-cols-2 divide-x-2 divide-black">
-              {/* Player 1 Option */}
-              <button
-                type="button"
-                disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
-                onClick={() => handlePredictWinner('player_1')}
-                className={`p-3 text-left transition-colors flex flex-col justify-between ${
-                  predictedWinner === 'player_1'
-                    ? 'bg-[#CCFF00] text-black font-extrabold'
-                    : predictedWinner
-                      ? 'bg-paper opacity-50 cursor-not-allowed'
-                      : 'bg-white hover:bg-black hover:text-white cursor-pointer active:scale-[0.99]'
+              {/* Player 1 Card */}
+              <div
+                className={`p-2.5 sm:p-3 flex flex-col justify-between transition-colors ${
+                  predictedWinner === 'player_1' ? 'bg-[#CCFF00]/15' : 'bg-white'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <DoodlePlayer1 size={28} />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-mono opacity-60">PLAYER 1</div>
-                    <div className="font-bold text-xs sm:text-sm truncate">{p1?.name || 'Player 1'}</div>
+                <div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+                    <div className="border border-black p-0.5 bg-paper shrink-0">
+                      <DoodlePlayer1 size={26} className="sm:w-7 sm:h-7" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[9px] font-mono font-bold text-black/60">PLAYER 1</div>
+                      <div className="font-bold text-xs sm:text-sm truncate">
+                        {p1?.name || 'Player 1'}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-3 flex justify-between items-end">
-                  <span className="text-[10px] font-mono font-bold">{a} bets</span>
-                  <span className="font-mono text-sm font-extrabold">{aPct}%</span>
-                </div>
-              </button>
 
-              {/* Player 2 Option */}
-              <button
-                type="button"
-                disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
-                onClick={() => handlePredictWinner('player_2')}
-                className={`p-3 text-left transition-colors flex flex-col justify-between ${
-                  predictedWinner === 'player_2'
-                    ? 'bg-[#CCFF00] text-black font-extrabold'
-                    : predictedWinner
-                      ? 'bg-paper opacity-50 cursor-not-allowed'
-                      : 'bg-white hover:bg-black hover:text-white cursor-pointer active:scale-[0.99]'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <DoodlePlayer2 size={28} />
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-mono opacity-60">PLAYER 2</div>
-                    <div className="font-bold text-xs sm:text-sm truncate">{p2?.name || 'Player 2'}</div>
+                  {/* Test Cases Progress */}
+                  <div className="mb-2.5">
+                    <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1">
+                      <span className="text-black/60">TESTS</span>
+                      <span>
+                        {p1 ? `${p1.passed}/${p1.total}` : `0/${totalTests}`}
+                      </span>
+                    </div>
+                    <Bar passed={p1?.passed ?? 0} total={p1?.total ?? totalTests} />
                   </div>
                 </div>
-                <div className="mt-3 flex justify-between items-end">
-                  <span className="text-[10px] font-mono font-bold">{b} bets</span>
-                  <span className="font-mono text-sm font-extrabold">{100 - aPct}%</span>
+
+                {/* Bet Action */}
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
+                    onClick={() => handlePredictWinner('player_1')}
+                    className={`w-full py-1.5 px-2 border border-black font-bold text-xs flex items-center justify-between transition-all select-none ${
+                      predictedWinner === 'player_1'
+                        ? 'bg-[#CCFF00] text-black font-extrabold shadow-[1px_1px_0px_#000]'
+                        : predictedWinner
+                          ? 'bg-paper text-black/40 cursor-not-allowed border-black/40'
+                          : 'bg-black text-white hover:bg-white hover:text-black cursor-pointer active:scale-95 shadow-[1px_1px_0px_#000]'
+                    }`}
+                  >
+                    <span className="truncate text-[11px]">
+                      {predictedWinner === 'player_1' ? 'YOUR BET ✓' : predictedWinner ? 'P1' : 'BET P1'}
+                    </span>
+                    <span className="font-mono text-xs font-extrabold ml-1">{aPct}%</span>
+                  </button>
+                  <div className="text-[10px] font-mono text-center text-black/60 mt-0.5">
+                    {a} {a === 1 ? 'bet' : 'bets'}
+                  </div>
                 </div>
-              </button>
+              </div>
+
+              {/* Player 2 Card */}
+              <div
+                className={`p-2.5 sm:p-3 flex flex-col justify-between transition-colors ${
+                  predictedWinner === 'player_2' ? 'bg-[#CCFF00]/15' : 'bg-white'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-2">
+                    <div className="border border-black p-0.5 bg-paper shrink-0">
+                      <DoodlePlayer2 size={26} className="sm:w-7 sm:h-7" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[9px] font-mono font-bold text-black/60">PLAYER 2</div>
+                      <div className="font-bold text-xs sm:text-sm truncate">
+                        {p2?.name || 'Player 2'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Test Cases Progress */}
+                  <div className="mb-2.5">
+                    <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1">
+                      <span className="text-black/60">TESTS</span>
+                      <span>
+                        {p2 ? `${p2.passed}/${p2.total}` : `0/${totalTests}`}
+                      </span>
+                    </div>
+                    <Bar passed={p2?.passed ?? 0} total={p2?.total ?? totalTests} />
+                  </div>
+                </div>
+
+                {/* Bet Action */}
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
+                    onClick={() => handlePredictWinner('player_2')}
+                    className={`w-full py-1.5 px-2 border border-black font-bold text-xs flex items-center justify-between transition-all select-none ${
+                      predictedWinner === 'player_2'
+                        ? 'bg-[#CCFF00] text-black font-extrabold shadow-[1px_1px_0px_#000]'
+                        : predictedWinner
+                          ? 'bg-paper text-black/40 cursor-not-allowed border-black/40'
+                          : 'bg-black text-white hover:bg-white hover:text-black cursor-pointer active:scale-95 shadow-[1px_1px_0px_#000]'
+                    }`}
+                  >
+                    <span className="truncate text-[11px]">
+                      {predictedWinner === 'player_2' ? 'YOUR BET ✓' : predictedWinner ? 'P2' : 'BET P2'}
+                    </span>
+                    <span className="font-mono text-xs font-extrabold ml-1">{100 - aPct}%</span>
+                  </button>
+                  <div className="text-[10px] font-mono text-center text-black/60 mt-0.5">
+                    {b} {b === 1 ? 'bet' : 'bets'}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Live Tug-of-War Bar */}
             <div className="border-t-2 border-black p-2.5 bg-paper">
               <div className="flex justify-between text-[11px] font-bold mb-1">
-                <span>{p1?.name || 'PLAYER 1'}: {aPct}%</span>
-                <span className="font-hand text-[10px] text-black/60">CROWD TALLY</span>
-                <span>{p2?.name || 'PLAYER 2'}: {100 - aPct}%</span>
+                <span className="truncate max-w-[110px] sm:max-w-none">{p1?.name || 'PLAYER 1'}: {aPct}%</span>
+                <span className="font-hand text-[10px] text-black/60 shrink-0">CROWD TALLY</span>
+                <span className="truncate max-w-[110px] sm:max-w-none">{p2?.name || 'PLAYER 2'}: {100 - aPct}%</span>
               </div>
-              <div className="flex h-3.5 sm:h-4 border border-black bg-white shadow-[1px_1px_0px_#000]">
+              <div className="flex h-3.5 border border-black bg-white shadow-[1px_1px_0px_#000] overflow-hidden">
                 <div className="bg-black transition-all duration-300" style={{ width: `${aPct}%` }} />
                 <div className="hatch flex-1" />
               </div>
@@ -488,7 +563,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
           </section>
 
           {/* 2. BUG GUESSING (+50 PTS) */}
-          <section className="border-b-2 border-black bg-white">
+          <section className="border-2 border-black bg-white shadow-[2px_2px_0px_#000]">
             <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
               <div>
                 <span className="font-heading font-extrabold text-xs tracking-wider">2. GUESS THE BUG TYPE</span>
@@ -496,7 +571,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
               </div>
               {guessedBug && (
                 <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shadow-[1px_1px_0px_#000]">
-                  LOCKED IN: {guessedBug.replace('_', ' ')}
+                  LOCKED IN ✓
                 </span>
               )}
             </div>
@@ -518,7 +593,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
                         ? 'bg-[#CCFF00] text-black font-extrabold'
                         : guessedBug
                           ? 'bg-white opacity-60 cursor-not-allowed'
-                          : 'bg-white hover:bg-black hover:text-white cursor-pointer'
+                          : 'bg-white hover:bg-black hover:text-white cursor-pointer active:bg-black/10'
                     }`}
                   >
                     <div
@@ -538,8 +613,8 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
             </div>
           </section>
 
-          {/* 3. VOTE NEXT ROUND BUG CATEGORY */}
-          <section className="border-b-2 border-black bg-white">
+          {/* 3. VOTE NEXT ROUND'S BUG CATEGORY */}
+          <section className="border-2 border-black bg-white shadow-[2px_2px_0px_#000]">
             <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
               <div>
                 <span className="font-heading font-extrabold text-xs tracking-wider">3. VOTE NEXT ROUND'S BUG</span>
@@ -547,7 +622,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
               </div>
               {votedNextBug && (
                 <span className="bg-black text-white px-2 py-0.5 text-[10px] font-bold uppercase">
-                  VOTED: {votedNextBug.replace('_', ' ')}
+                  VOTED ✓
                 </span>
               )}
             </div>
@@ -569,7 +644,7 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
                         ? 'bg-black text-white font-extrabold'
                         : votedNextBug
                           ? 'bg-white opacity-60 cursor-not-allowed'
-                          : 'bg-white hover:bg-black hover:text-white cursor-pointer'
+                          : 'bg-white hover:bg-black hover:text-white cursor-pointer active:bg-black/10'
                     }`}
                   >
                     <div
@@ -588,26 +663,26 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
               })}
             </div>
           </section>
-        </>
+        </div>
       )}
 
-      {/* Local floating reactions */}
+      {/* Floating Reaction Animations */}
       {localEmotes.map((e) => (
         <div
           key={e.id}
-          className="fixed bottom-24 text-3xl pointer-events-none transition-all duration-1000 ease-out animate-in fade-in slide-in-from-bottom-12 z-50"
+          className="fixed bottom-20 text-3xl pointer-events-none transition-all duration-1000 ease-out animate-in fade-in slide-in-from-bottom-12 z-50"
           style={{ left: `${e.x}%`, transform: 'translateY(-80px)' }}
         >
           {e.icon}
         </div>
       ))}
 
-      {/* Bottom Floating Reaction Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 max-w-xl mx-auto border-t-2 border-black bg-white p-2 flex items-center justify-between gap-1 shadow-[0px_-2px_0px_#000] z-40">
-        <div className="flex items-center gap-1.5 px-2">
-          <Crowd count={Math.min(room.spectator_count, 6)} size={24} />
-          <span className="font-hand text-[11px] font-bold text-black/75 hidden sm:inline">
-            CHEER:
+      {/* 6. BOTTOM FLOATING REACTION BAR */}
+      <footer className="fixed bottom-0 left-0 right-0 max-w-xl mx-auto border-t-2 border-black bg-white px-3 py-2 flex items-center justify-between gap-2 shadow-[0px_-2px_0px_#000] z-40">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Crowd count={Math.min(room.spectator_count, 6)} size={22} />
+          <span className="font-mono text-xs font-bold text-black/75">
+            CROWD ({room.spectator_count ?? 1})
           </span>
         </div>
 

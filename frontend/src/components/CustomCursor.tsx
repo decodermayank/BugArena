@@ -442,7 +442,7 @@ export function CursorToggle({ className }: { className?: string }) {
     <button
       type="button"
       onClick={handleCycleColor}
-      className={`border border-black px-2 py-0.5 text-[11px] font-bold transition-all cursor-pointer select-none flex items-center gap-1.5 bg-white text-black hover:bg-black hover:text-white group ${
+      className={`border border-black px-2 py-1 text-xs font-bold transition-all cursor-pointer select-none hidden sm:inline-flex items-center gap-1.5 bg-white text-black hover:bg-black hover:text-white group shrink-0 ${
         className ?? ''
       }`}
       title={`Cursor: ${palette.label} (Click to cycle colors, Shift+Click to toggle Custom/Native)`}
@@ -454,7 +454,8 @@ export function CursorToggle({ className }: { className?: string }) {
           boxShadow: enabled && palette.id !== 'mono' ? `0 0 5px ${palette.hex}` : 'none',
         }}
       />
-      <span className="hidden sm:inline">CURSOR:</span> {enabled ? palette.name.toUpperCase() : 'OFF'}
+      <span className="hidden md:inline text-[11px] font-mono">CURSOR:</span>
+      <span className="text-[11px] font-mono">{enabled ? palette.name.toUpperCase() : 'OFF'}</span>
     </button>
   );
 }
