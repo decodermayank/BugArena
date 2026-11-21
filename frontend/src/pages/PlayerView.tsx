@@ -126,53 +126,79 @@ export default function PlayerView({ session }: { session: RoomSession }) {
   return (
     <div className="h-dvh w-screen overflow-hidden flex flex-col bg-[#FAFAFA] text-black select-none">
       {/* Top Header */}
-      <header className="border-b-2 border-black flex items-stretch text-xs sm:text-sm bg-white shrink-0">
-        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 shrink-0">
-          <span className="font-heading font-extrabold text-sm sm:text-lg">BUGARENA</span>
-          <DoodleBug size={18} className="shrink-0 sm:w-5 sm:h-5" />
+      <header className="border-b-2 border-black flex items-stretch text-xs sm:text-sm bg-white shrink-0 w-full overflow-hidden">
+        <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 shrink-0">
+          <span className="font-heading font-extrabold text-xs sm:text-base">BUGARENA</span>
+          <DoodleBug size={16} className="shrink-0 sm:w-5 sm:h-5" />
         </div>
 
-        <div className="border-l-2 border-black px-2 sm:px-3 py-1 flex items-center gap-1.5 shrink-0 max-w-[130px] sm:max-w-none bg-paper">
-          <Me size={20} className="shrink-0 sm:w-6 sm:h-6" />
-          <span className="font-bold truncate text-[11px] sm:text-sm">
+        {/* You badge */}
+        <div className="border-l-2 border-black px-1.5 sm:px-3 py-1 flex items-center gap-1 shrink-0 max-w-[110px] sm:max-w-none bg-paper">
+          <Me size={16} className="shrink-0 sm:w-5 sm:h-5" />
+          <span className="font-bold truncate text-[10px] sm:text-xs">
             {myPlayer.name} ({myPlayer.passed}/{total})
           </span>
         </div>
 
-        <div className="border-l-2 border-black px-2 sm:px-3 py-1 flex items-center gap-1.5 flex-1 min-w-0">
-          <span className="font-hand text-xs text-black/60">vs</span>
-          <Opp size={18} className="shrink-0 sm:w-5 sm:h-5 opacity-70" />
-          <span className="font-bold truncate text-[11px] sm:text-sm text-black/80">
-            {opponent ? `${opponent.name} (${opponent.passed}/${total})` : 'waiting for rival...'}
+        {/* Rival badge */}
+        <div className="border-l-2 border-black px-1.5 sm:px-3 py-1 flex items-center gap-1 flex-1 min-w-0">
+          <span className="font-hand text-[10px] text-black/60 hidden xs:inline">vs</span>
+          <Opp size={16} className="shrink-0 sm:w-5 sm:h-5 opacity-70" />
+          <span className="font-bold truncate text-[10px] sm:text-xs text-black/80">
+            {opponent ? `${opponent.name} (${opponent.passed}/${total})` : 'waiting...'}
           </span>
         </div>
 
-        <div className="border-l-2 border-black px-2 flex items-center gap-1 shrink-0">
+        {/* Sound & Cursor Toggles */}
+        <div className="hidden sm:flex border-l-2 border-black px-2 items-center gap-1 shrink-0">
           <SoundToggle />
           <CursorToggle />
         </div>
 
-        <div className="hidden sm:flex border-l-2 border-black px-3 items-center font-mono font-bold shrink-0">
+        <div className="hidden md:flex border-l-2 border-black px-2.5 items-center font-mono font-bold text-xs shrink-0">
           ROOM {room.room_code}
         </div>
 
+        {/* PINNED COUNTDOWN TIMER - ALWAYS VISIBLE ON ALL SCREENS */}
         <div
-          className={`border-l-2 border-black px-3 sm:px-5 flex items-center font-heading font-extrabold text-sm sm:text-xl shrink-0 ${
-            active && secondsLeft <= 15 ? 'bg-black text-white animate-pulse' : active ? 'bg-black text-white' : 'bg-white'
+          className={`border-l-2 border-black px-2.5 sm:px-5 flex items-center gap-1.5 font-mono font-extrabold text-xs sm:text-base shrink-0 ml-auto tabular-nums select-none ${
+            active && secondsLeft <= 15
+              ? 'bg-red-600 text-white animate-pulse'
+              : active && secondsLeft <= 30
+                ? 'bg-[#CCFF00] text-black font-extrabold'
+                : active
+                  ? 'bg-black text-white'
+                  : 'bg-paper text-black'
           }`}
+          title={`Time remaining: ${formatClock(secondsLeft)}`}
         >
-          {formatClock(secondsLeft)}
+          <span>⏱</span>
+          <span>{formatClock(secondsLeft)}</span>
         </div>
       </header>
 
       {/* Adrenaline Opponent Drag-Strip Race Track */}
-      <div className="border-b-2 border-black bg-white px-3 sm:px-4 py-2 shrink-0 flex flex-col gap-1.5 shadow-[0px_2px_0px_#000]">
+      <div className="border-b-2 border-black bg-white px-2 sm:px-4 py-1.5 sm:py-2 shrink-0 flex flex-col gap-1 shadow-[0px_2px_0px_#000]">
         <div className="flex items-center justify-between text-[11px] font-bold">
-          <div className="flex items-center gap-1">
-            <span className="font-mono">⚡ LIVE RACE TRACK</span>
-            <span className="font-hand text-black/60 text-xs hidden sm:inline">(first to pass all tests wins)</span>
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <span className="font-mono text-[10px] sm:text-xs">⚡ LIVE RACE TRACK</span>
+            <span className="font-hand text-black/60 text-xs hidden sm:inline">(first to squash all bugs wins)</span>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Clock Badge in Track Bar */}
+            <div
+              className={`px-1.5 sm:px-2 py-0.5 border border-black font-mono font-bold text-[10px] sm:text-xs flex items-center gap-1 shadow-[1px_1px_0px_#000] ${
+                active && secondsLeft <= 15
+                  ? 'bg-red-600 text-white animate-pulse'
+                  : active && secondsLeft <= 30
+                    ? 'bg-[#CCFF00] text-black font-extrabold'
+                    : 'bg-paper text-black'
+              }`}
+            >
+              <span>⏱ {formatClock(secondsLeft)}</span>
+            </div>
+
             <span className="text-[10px] sm:text-xs">
               YOU: <span className="font-mono font-bold">{myPlayer.passed}/{total}</span>
             </span>
@@ -220,33 +246,47 @@ export default function PlayerView({ session }: { session: RoomSession }) {
         </div>
       </div>
 
-      {/* Mobile Tab Bar */}
-      <div className="md:hidden grid grid-cols-2 border-b-2 border-black bg-[#f0f0f0] text-xs font-bold shrink-0">
+      {/* Mobile Tab Bar with Sticky Live Countdown Timer */}
+      <div className="md:hidden grid grid-cols-[1fr_1fr_auto] border-b-2 border-black bg-[#f0f0f0] text-xs font-bold shrink-0">
         <button
           type="button"
           onClick={() => setMobileTab('editor')}
-          className={`py-2 px-3 flex items-center justify-center gap-1.5 border-r border-black cursor-pointer transition-colors ${
+          className={`py-2 px-2 flex items-center justify-center gap-1 border-r border-black cursor-pointer transition-colors ${
             mobileTab === 'editor' ? 'bg-black text-white' : 'bg-white text-black'
           }`}
         >
-          <span>💻 CODE EDITOR</span>
+          <span>💻 CODE</span>
         </button>
         <button
           type="button"
           onClick={() => setMobileTab('problem')}
-          className={`py-2 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+          className={`py-2 px-2 flex items-center justify-center gap-1 border-r border-black cursor-pointer transition-colors ${
             mobileTab === 'problem' ? 'bg-black text-white' : 'bg-white text-black'
           }`}
         >
-          <span>📋 PROBLEM & TESTS</span>
+          <span>📋 PROBLEM</span>
           <span
-            className={`px-1.5 py-0.5 text-[10px] font-bold ${
+            className={`px-1 py-0.2 text-[10px] font-bold ${
               mobileTab === 'problem' ? 'bg-white text-black' : 'bg-black text-white'
             }`}
           >
             {result ? `${result.passed}/${result.total}` : `${myPlayer.passed}/${total}`}
           </span>
         </button>
+
+        {/* Live Timer directly in Mobile Tab Bar */}
+        <div
+          className={`px-3 py-2 flex items-center justify-center gap-1 font-mono font-extrabold text-xs tabular-nums ${
+            active && secondsLeft <= 15
+              ? 'bg-red-600 text-white animate-pulse'
+              : active && secondsLeft <= 30
+                ? 'bg-[#CCFF00] text-black font-extrabold'
+                : 'bg-black text-white'
+          }`}
+        >
+          <span>⏱</span>
+          <span>{formatClock(secondsLeft)}</span>
+        </div>
       </div>
 
       {/* Main Split: Left (Problem + Test Cards), Right (Monaco + Controls) */}

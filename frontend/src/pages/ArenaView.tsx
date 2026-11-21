@@ -73,6 +73,8 @@ export default function ArenaView() {
   const [fightBannerTitle, setFightBannerTitle] = useState('');
   const [powAlerts, setPowAlerts] = useState<PowAlert[]>([]);
   const [floatingEmotes, setFloatingEmotes] = useState<FloatingEmote[]>([]);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Sound & event tracking refs
   const prevStatusRef = useRef<string | null>(null);
@@ -302,12 +304,72 @@ export default function ArenaView() {
             <div className="border-2 border-black p-3 bg-white shadow-[3px_3px_0px_#000]">
               <QRCodeSVG value={joinUrl} size={150} level="M" bgColor="#FFFFFF" fgColor="#000000" />
             </div>
-            <span className="font-hand text-xs">or enter room code</span>
-            <div className="w-full max-w-[220px] bg-[#CCFF00] text-black border-2 border-black py-2.5 px-3 font-heading font-extrabold text-2xl sm:text-3xl tracking-[0.2em] text-center leading-none shadow-[2px_2px_0px_#000]">
-              {room.room_code}
+            <span className="font-hand text-xs sm:text-sm">or enter room code</span>
+
+            {/* Retro Segmented Room Code Box */}
+            <div
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(room?.room_code ?? '');
+                  setCopiedCode(true);
+                  soundFx.playEmotePop();
+                  setTimeout(() => setCopiedCode(false), 2000);
+                } catch {
+                  // ignore
+                }
+              }}
+              className="w-full max-w-[260px] sm:max-w-[280px] bg-[#CCFF00] text-black border-2 border-black p-2 shadow-[3px_3px_0px_#000] cursor-pointer hover:brightness-105 active:translate-y-0.5 transition-all select-all flex items-center justify-center"
+              title="Click to copy room code"
+            >
+              <div className="grid grid-cols-6 gap-1 w-full text-center font-mono font-extrabold text-xl sm:text-2xl text-black">
+                {room.room_code.split('').map((char, idx) => (
+                  <span
+                    key={idx}
+                    className="aspect-square flex items-center justify-center bg-white/40 border border-black/30 font-bold"
+                  >
+                    {char}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="text-[11px] font-mono break-all text-center max-w-full px-2 text-black/70">
-              {joinUrl}
+
+            {/* Click to copy feedback */}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(room?.room_code ?? '');
+                  setCopiedCode(true);
+                  soundFx.playEmotePop();
+                  setTimeout(() => setCopiedCode(false), 2000);
+                } catch {
+                  // ignore
+                }
+              }}
+              className="font-hand text-[11px] text-black/75 hover:text-black flex items-center gap-1 cursor-pointer underline decoration-dotted"
+            >
+              {copiedCode ? '✓ COPIED TO CLIPBOARD!' : '📋 CLICK CODE TO COPY'}
+            </button>
+
+            {/* Direct Join Link */}
+            <div className="w-full max-w-[260px] sm:max-w-[280px] border border-black/50 bg-paper p-1 flex items-center justify-between gap-1 text-[11px] font-mono shadow-[1px_1px_0px_#000]">
+              <span className="truncate text-black/80 px-1 text-[10px] sm:text-[11px]">{joinUrl}</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(joinUrl);
+                    setCopiedLink(true);
+                    soundFx.playEmotePop();
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  } catch {
+                    // ignore
+                  }
+                }}
+                className="shrink-0 font-bold px-1.5 py-0.5 bg-black text-white hover:bg-black/80 text-[10px] cursor-pointer transition-colors"
+              >
+                {copiedLink ? '✓ COPIED' : 'COPY'}
+              </button>
             </div>
           </div>
         </section>

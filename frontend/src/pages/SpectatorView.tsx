@@ -40,6 +40,9 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
   const round = room?.round ?? 1;
   const roomCode = room?.room_code ?? '';
 
+  const [activeTab, setActiveTab] = useState<'betting' | 'question'>('betting');
+  const [codeExpanded, setCodeExpanded] = useState<boolean>(true);
+
   const [predictedWinner, setPredictedWinner] = useState<PlayerSlot | null>(() => {
     return (sessionStorage.getItem(`ba_w_${roomCode}_${round}`) as PlayerSlot) || null;
   });
@@ -139,7 +142,9 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
         </div>
         <div className="border-r-2 border-black py-2">
           <div className="font-hand text-[10px] sm:text-xs text-black/70">TIME</div>
-          <div className="font-mono font-bold text-xs sm:text-sm">{formatClock(secondsLeft)}</div>
+          <div className={`font-mono font-extrabold text-xs sm:text-sm ${secondsLeft <= 15 ? 'text-red-600 animate-pulse' : ''}`}>
+            ⏱ {formatClock(secondsLeft)}
+          </div>
         </div>
         <div className="py-2">
           <div className="font-hand text-[10px] sm:text-xs text-black/70">ROUND</div>
@@ -147,278 +152,412 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
         </div>
       </div>
 
-      {/* Live Duelists Progress */}
-      <section className="border-b-2 border-black p-3.5 flex flex-col gap-3 bg-white">
-        <div className="flex items-center justify-between text-xs font-bold text-black/70">
-          <span className="font-heading font-extrabold text-xs tracking-wider">LIVE CHALLENGERS</span>
-          <span className="font-mono">{room.problem.title}</span>
-        </div>
-        {[p1, p2].map((p, i) => (
-          <div key={i} className="flex items-center gap-2.5 sm:gap-3">
-            <div className="border border-black p-0.5 bg-paper shrink-0">
-              {i === 0 ? <DoodlePlayer1 size={36} /> : <DoodlePlayer2 size={36} />}
+      {/* Navigation Tabs (Mobile & Desktop Friendly) */}
+      <div className="grid grid-cols-2 border-b-2 border-black bg-[#f0f0f0] text-xs font-bold shrink-0 sticky top-0 z-30 shadow-[0_2px_0_#000]">
+        <button
+          type="button"
+          onClick={() => setActiveTab('betting')}
+          className={`py-2.5 px-3 flex items-center justify-center gap-1.5 border-r border-black cursor-pointer transition-colors ${
+            activeTab === 'betting' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/10'
+          }`}
+        >
+          <span>🎯 PREDICTIONS & BETS</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('question')}
+          className={`py-2.5 px-3 flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+            activeTab === 'question' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/10'
+          }`}
+        >
+          <span>📋 VIEW QUESTION & CODE</span>
+          <span className="w-2 h-2 rounded-full bg-[#CCFF00] inline-block" />
+        </button>
+      </div>
+
+      {/* TAB 1: CHALLENGE QUESTION & BUGGY CODE (WHAT CHALLENGERS SEE) */}
+      {activeTab === 'question' && (
+        <section className="flex flex-col gap-3 p-3.5 bg-[#FAFAFA] animate-in fade-in duration-200">
+          {/* Question Brief */}
+          <div className="border-2 border-black bg-white p-3.5 sm:p-4 shadow-[2px_2px_0px_#000]">
+            <div className="flex items-center justify-between">
+              <span className="font-hand text-xs text-black/70">ROUND {room.round} CHALLENGE</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 border border-black bg-[#CCFF00] text-black shadow-[1px_1px_0px_#000]">
+                ACTIVE PROBLEM
+              </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex justify-between text-xs font-bold mb-1">
-                <span className="truncate">{p ? p.name : `PLAYER ${i + 1}: waiting...`}</span>
-                <span className="ml-2 shrink-0 font-mono">
-                  {p ? `${p.passed}/${p.total}` : '-'}
-                </span>
-              </div>
-              <Bar passed={p?.passed ?? 0} total={p?.total ?? room.problem.test_cases.length} />
+            <h2 className="font-heading font-extrabold text-lg sm:text-2xl leading-tight mt-1 text-black">
+              {room.problem.title}
+            </h2>
+            <div className="text-xs sm:text-sm mt-2 whitespace-pre-wrap leading-relaxed text-black/90 font-mono bg-paper p-2.5 border border-black/30">
+              {room.problem.description}
+            </div>
+            <div className="mt-2 text-xs font-hand text-black/80 flex items-center gap-1.5">
+              <span>💡</span>
+              <span className="font-bold">Goal: Challengers are looking for 1 mutated bug in this code.</span>
             </div>
           </div>
-        ))}
-      </section>
 
-      {/* END-OF-ROUND FINISHED RESULTS & LEADERBOARD */}
-      {room.status === 'FINISHED' && (
-        <section className="border-b-2 border-black bg-white flex flex-col shadow-[2px_2px_0px_#000]">
-          <div className="bg-black text-white p-4 text-center">
-            <div className="font-hand text-xs text-[#CCFF00] tracking-widest uppercase">ROUND {room.round} COMPLETED</div>
-            <div className="font-display italic text-3xl sm:text-4xl mt-1">
-              {room.winner ? `${room.winner.name} wins!` : 'Stalemate / Draw!'}
+          {/* Buggy Code Inspector (Exact code challenger sees in Monaco Editor) */}
+          <div className="border-2 border-black bg-white shadow-[2px_2px_0px_#000]">
+            <div className="border-b-2 border-black px-3 py-2 bg-black text-white flex justify-between items-center text-xs font-bold">
+              <span className="flex items-center gap-1.5">
+                <span>💻 BUGGY CODE BEING SOLVED</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setCodeExpanded(!codeExpanded)}
+                className="font-hand text-[11px] text-[#CCFF00] hover:underline cursor-pointer"
+              >
+                {codeExpanded ? 'hide code ▲' : 'show code ▼'}
+              </button>
             </div>
-            {room.winner && (
-              <div className="font-mono text-xs text-white/80 mt-1">
-                {room.winner.passed}/{room.winner.total} tests passing in {room.winner.completion_time}s
+            {codeExpanded && (
+              <div className="p-3 bg-paper font-mono text-xs overflow-x-auto">
+                <pre className="text-black leading-relaxed whitespace-pre font-mono">
+                  {room.problem.buggy_code}
+                </pre>
               </div>
             )}
           </div>
 
-          {/* Crowd Callout Box */}
-          {room.crowd_callout && (
-            <div className="bg-[#CCFF00] border-b-2 border-black p-3 text-center">
-              <div className="font-heading font-extrabold text-sm sm:text-base leading-tight uppercase">
-                ⚡ {room.crowd_callout.headline}
-              </div>
-              <div className="font-hand text-xs text-black/80 mt-0.5">
-                {room.crowd_callout.subtitle}
-              </div>
+          {/* Test Verification Cases */}
+          <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_#000]">
+            <div className="font-heading font-extrabold text-xs uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>TEST VERIFICATION CASES ({room.problem.test_cases.length})</span>
             </div>
-          )}
-
-          {/* Leaderboard Table */}
-          <div className="p-3">
-            <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider mb-2">
-              <span className="flex items-center gap-1">🏆 CROWD LEADERBOARD</span>
-              <span className="text-[10px] text-black/60 font-mono">SCORES</span>
-            </div>
-            <div className="border border-black divide-y border-black bg-white">
-              {room.leaderboard && room.leaderboard.length > 0 ? (
-                room.leaderboard.map((entry, idx) => (
-                  <div key={entry.id || idx} className="flex justify-between items-center px-2.5 py-1.5 text-xs font-bold">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`w-5 h-5 flex items-center justify-center border border-black text-[10px] shrink-0 ${
-                        idx === 0 ? 'bg-[#CCFF00] text-black font-extrabold' : 'bg-paper text-black'
-                      }`}>
-                        #{idx + 1}
-                      </span>
-                      <span className="truncate max-w-[150px]">{entry.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {entry.round_points > 0 && (
-                        <span className="text-[10px] bg-[#CCFF00] text-black px-1 border border-black font-mono">
-                          +{entry.round_points}
-                        </span>
-                      )}
-                      <span className="font-mono text-xs">{entry.score} PTS</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-3 text-center font-hand text-xs text-black/60">
-                  No predictions recorded.
+            <div className="space-y-1.5">
+              {room.problem.test_cases.map((t, idx) => (
+                <div key={idx} className="border border-black p-2 bg-paper text-xs font-mono">
+                  <div className="font-bold text-black/70 text-[11px]">{t.name}</div>
+                  <pre className="mt-1 bg-white border border-black/30 p-1.5 overflow-x-auto text-[11px] whitespace-pre-wrap">
+                    {t.code}
+                  </pre>
                 </div>
-              )}
+              ))}
             </div>
           </div>
+
+          {/* Bug Category Cheat Sheet */}
+          <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_#000]">
+            <div className="font-heading font-extrabold text-xs uppercase tracking-wider mb-1.5">
+              🔍 BUG TYPES CHEAT SHEET
+            </div>
+            <div className="text-[11px] space-y-1 text-black/80 font-hand">
+              <div>&bull; <span className="font-bold">OFF-BY-ONE:</span> Loop index boundary, range(1, n) slip, +/- 1 offset.</div>
+              <div>&bull; <span className="font-bold">INVERTED LOGIC:</span> Flipped if conditions (&lt; vs &gt;, == vs !=).</div>
+              <div>&bull; <span className="font-bold">BROKEN MATH:</span> Arithmetic mutation (+ vs -, * vs //, wrong order).</div>
+            </div>
+          </div>
+
+          {/* Quick jump to predictions */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('betting')}
+            className="btn-ink w-full py-3 text-sm font-bold tracking-wider cursor-pointer shadow-[3px_3px_0px_#000]"
+          >
+            🎯 GO TO CROWD PREDICTIONS & BETTING →
+          </button>
         </section>
       )}
 
-      {/* 1. WINNER GUESS (+100 PTS) */}
-      <section className="border-b-2 border-black bg-white">
-        <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
-          <div>
-            <span className="font-heading font-extrabold text-xs tracking-wider">1. GUESS THE WINNER</span>
-            <span className="ml-2 font-hand text-xs text-black/70">+100 PTS</span>
-          </div>
-          {predictedWinner && (
-            <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shadow-[1px_1px_0px_#000]">
-              LOCKED IN: {predictedWinner === 'player_1' ? (p1?.name || 'P1') : (p2?.name || 'P2')}
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 divide-x-2 divide-black">
-          {/* Player 1 Option */}
-          <button
-            type="button"
-            disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
-            onClick={() => handlePredictWinner('player_1')}
-            className={`p-3 text-left transition-colors flex flex-col justify-between ${
-              predictedWinner === 'player_1'
-                ? 'bg-[#CCFF00] text-black font-extrabold'
-                : predictedWinner
-                  ? 'bg-paper opacity-50 cursor-not-allowed'
-                  : 'bg-white hover:bg-black hover:text-white cursor-pointer active:scale-[0.99]'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <DoodlePlayer1 size={28} />
-              <div className="min-w-0">
-                <div className="text-[10px] font-mono opacity-60">PLAYER 1</div>
-                <div className="font-bold text-xs sm:text-sm truncate">{p1?.name || 'Player 1'}</div>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-between items-end">
-              <span className="text-[10px] font-mono font-bold">{a} bets</span>
-              <span className="font-mono text-sm font-extrabold">{aPct}%</span>
-            </div>
-          </button>
-
-          {/* Player 2 Option */}
-          <button
-            type="button"
-            disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
-            onClick={() => handlePredictWinner('player_2')}
-            className={`p-3 text-left transition-colors flex flex-col justify-between ${
-              predictedWinner === 'player_2'
-                ? 'bg-[#CCFF00] text-black font-extrabold'
-                : predictedWinner
-                  ? 'bg-paper opacity-50 cursor-not-allowed'
-                  : 'bg-white hover:bg-black hover:text-white cursor-pointer active:scale-[0.99]'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <DoodlePlayer2 size={28} />
-              <div className="min-w-0">
-                <div className="text-[10px] font-mono opacity-60">PLAYER 2</div>
-                <div className="font-bold text-xs sm:text-sm truncate">{p2?.name || 'Player 2'}</div>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-between items-end">
-              <span className="text-[10px] font-mono font-bold">{b} bets</span>
-              <span className="font-mono text-sm font-extrabold">{100 - aPct}%</span>
-            </div>
-          </button>
-        </div>
-
-        {/* Live Tug-of-War Bar */}
-        <div className="border-t-2 border-black p-2.5 bg-paper">
-          <div className="flex justify-between text-[11px] font-bold mb-1">
-            <span>{p1?.name || 'PLAYER 1'}: {aPct}%</span>
-            <span className="font-hand text-[10px] text-black/60">CROWD TALLY</span>
-            <span>{p2?.name || 'PLAYER 2'}: {100 - aPct}%</span>
-          </div>
-          <div className="flex h-3.5 sm:h-4 border border-black bg-white shadow-[1px_1px_0px_#000]">
-            <div className="bg-black transition-all duration-300" style={{ width: `${aPct}%` }} />
-            <div className="hatch flex-1" />
-          </div>
-        </div>
-      </section>
-
-      {/* 2. BUG GUESSING (+50 PTS) */}
-      <section className="border-b-2 border-black bg-white">
-        <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
-          <div>
-            <span className="font-heading font-extrabold text-xs tracking-wider">2. GUESS THE BUG TYPE</span>
-            <span className="ml-2 font-hand text-xs text-black/70">+50 PTS</span>
-          </div>
-          {guessedBug && (
-            <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shadow-[1px_1px_0px_#000]">
-              LOCKED IN: {guessedBug.replace('_', ' ')}
-            </span>
-          )}
-        </div>
-
-        <div className="divide-y divide-black">
-          {BUG_OPTIONS.map((opt) => {
-            const count = bugGuesses[opt.id] || 0;
-            const pct = totalBugGuesses > 0 ? Math.round((count / totalBugGuesses) * 100) : 0;
-            const isSelected = guessedBug === opt.id;
-
-            return (
+      {/* TAB 2: ARENA, PREDICTIONS & BETS */}
+      {activeTab === 'betting' && (
+        <>
+          {/* Quick Problem Peek Banner */}
+          <div className="border-b-2 border-black bg-white p-3 flex flex-col gap-1 shadow-[0_1px_0_#000]">
+            <div className="flex items-center justify-between">
+              <span className="font-hand text-[11px] text-black/70">ACTIVE CHALLENGE</span>
               <button
-                key={opt.id}
                 type="button"
-                disabled={Boolean(guessedBug) || room.status !== 'ACTIVE'}
-                onClick={() => handleGuessBug(opt.id)}
-                className={`w-full p-2.5 text-left transition-colors relative flex items-center justify-between ${
-                  isSelected
+                onClick={() => setActiveTab('question')}
+                className="text-[10px] font-bold px-2 py-0.5 border border-black bg-[#CCFF00] text-black hover:bg-black hover:text-white transition-colors cursor-pointer shadow-[1px_1px_0px_#000]"
+              >
+                VIEW QUESTION & CODE →
+              </button>
+            </div>
+            <div className="font-heading font-extrabold text-sm sm:text-base text-black">
+              {room.problem.title}
+            </div>
+            <p className="text-xs text-black/75 line-clamp-2 leading-relaxed">
+              {room.problem.description}
+            </p>
+          </div>
+
+          {/* Live Duelists Progress */}
+          <section className="border-b-2 border-black p-3.5 flex flex-col gap-3 bg-white">
+            <div className="flex items-center justify-between text-xs font-bold text-black/70">
+              <span className="font-heading font-extrabold text-xs tracking-wider">LIVE CHALLENGERS</span>
+              <span className="font-mono">{room.problem.title}</span>
+            </div>
+            {[p1, p2].map((p, i) => (
+              <div key={i} className="flex items-center gap-2.5 sm:gap-3">
+                <div className="border border-black p-0.5 bg-paper shrink-0">
+                  {i === 0 ? <DoodlePlayer1 size={36} /> : <DoodlePlayer2 size={36} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="truncate">{p ? p.name : `PLAYER ${i + 1}: waiting...`}</span>
+                    <span className="ml-2 shrink-0 font-mono">
+                      {p ? `${p.passed}/${p.total}` : '-'}
+                    </span>
+                  </div>
+                  <Bar passed={p?.passed ?? 0} total={p?.total ?? room.problem.test_cases.length} />
+                </div>
+              </div>
+            ))}
+          </section>
+
+          {/* END-OF-ROUND FINISHED RESULTS & LEADERBOARD */}
+          {room.status === 'FINISHED' && (
+            <section className="border-b-2 border-black bg-white flex flex-col shadow-[2px_2px_0px_#000]">
+              <div className="bg-black text-white p-4 text-center">
+                <div className="font-hand text-xs text-[#CCFF00] tracking-widest uppercase">ROUND {room.round} COMPLETED</div>
+                <div className="font-display italic text-3xl sm:text-4xl mt-1">
+                  {room.winner ? `${room.winner.name} wins!` : 'Stalemate / Draw!'}
+                </div>
+                {room.winner && (
+                  <div className="font-mono text-xs text-white/80 mt-1">
+                    {room.winner.passed}/{room.winner.total} tests passing in {room.winner.completion_time}s
+                  </div>
+                )}
+              </div>
+
+              {/* Crowd Callout Box */}
+              {room.crowd_callout && (
+                <div className="bg-[#CCFF00] border-b-2 border-black p-3 text-center">
+                  <div className="font-heading font-extrabold text-sm sm:text-base leading-tight uppercase">
+                    ⚡ {room.crowd_callout.headline}
+                  </div>
+                  <div className="font-hand text-xs text-black/80 mt-0.5">
+                    {room.crowd_callout.subtitle}
+                  </div>
+                </div>
+              )}
+
+              {/* Leaderboard Table */}
+              <div className="p-3">
+                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider mb-2">
+                  <span className="flex items-center gap-1">🏆 CROWD LEADERBOARD</span>
+                  <span className="text-[10px] text-black/60 font-mono">SCORES</span>
+                </div>
+                <div className="border border-black divide-y border-black bg-white">
+                  {room.leaderboard && room.leaderboard.length > 0 ? (
+                    room.leaderboard.map((entry, idx) => (
+                      <div key={entry.id || idx} className="flex justify-between items-center px-2.5 py-1.5 text-xs font-bold">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-5 h-5 flex items-center justify-center border border-black text-[10px] shrink-0 ${
+                            idx === 0 ? 'bg-[#CCFF00] text-black font-extrabold' : 'bg-paper text-black'
+                          }`}>
+                            #{idx + 1}
+                          </span>
+                          <span className="truncate max-w-[150px]">{entry.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {entry.round_points > 0 && (
+                            <span className="text-[10px] bg-[#CCFF00] text-black px-1 border border-black font-mono">
+                              +{entry.round_points}
+                            </span>
+                          )}
+                          <span className="font-mono text-xs">{entry.score} PTS</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center font-hand text-xs text-black/60">
+                      No predictions recorded.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 1. WINNER GUESS (+100 PTS) */}
+          <section className="border-b-2 border-black bg-white">
+            <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
+              <div>
+                <span className="font-heading font-extrabold text-xs tracking-wider">1. GUESS THE WINNER</span>
+                <span className="ml-2 font-hand text-xs text-black/70">+100 PTS</span>
+              </div>
+              {predictedWinner && (
+                <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shadow-[1px_1px_0px_#000]">
+                  LOCKED IN: {predictedWinner === 'player_1' ? (p1?.name || 'P1') : (p2?.name || 'P2')}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 divide-x-2 divide-black">
+              {/* Player 1 Option */}
+              <button
+                type="button"
+                disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
+                onClick={() => handlePredictWinner('player_1')}
+                className={`p-3 text-left transition-colors flex flex-col justify-between ${
+                  predictedWinner === 'player_1'
                     ? 'bg-[#CCFF00] text-black font-extrabold'
-                    : guessedBug
-                      ? 'bg-white opacity-60 cursor-not-allowed'
-                      : 'bg-white hover:bg-black hover:text-white cursor-pointer'
+                    : predictedWinner
+                      ? 'bg-paper opacity-50 cursor-not-allowed'
+                      : 'bg-white hover:bg-black hover:text-white cursor-pointer active:scale-[0.99]'
                 }`}
               >
-                <div
-                  className="absolute inset-y-0 left-0 bg-black/5 pointer-events-none"
-                  style={{ width: `${pct}%` }}
-                />
-                <div className="relative min-w-0 pr-2">
-                  <div className="font-bold text-xs">{opt.label}</div>
-                  <div className="font-hand text-[10px] opacity-75 truncate">{opt.hint}</div>
+                <div className="flex items-center gap-2">
+                  <DoodlePlayer1 size={28} />
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-mono opacity-60">PLAYER 1</div>
+                    <div className="font-bold text-xs sm:text-sm truncate">{p1?.name || 'Player 1'}</div>
+                  </div>
                 </div>
-                <div className="relative font-mono text-xs font-bold shrink-0">
-                  {pct}% ({count})
+                <div className="mt-3 flex justify-between items-end">
+                  <span className="text-[10px] font-mono font-bold">{a} bets</span>
+                  <span className="font-mono text-sm font-extrabold">{aPct}%</span>
                 </div>
               </button>
-            );
-          })}
-        </div>
-      </section>
 
-      {/* 3. VOTE NEXT ROUND BUG CATEGORY */}
-      <section className="border-b-2 border-black bg-white">
-        <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
-          <div>
-            <span className="font-heading font-extrabold text-xs tracking-wider">3. VOTE NEXT ROUND'S BUG</span>
-            <span className="ml-2 font-hand text-xs text-black/70">crowd power</span>
-          </div>
-          {votedNextBug && (
-            <span className="bg-black text-white px-2 py-0.5 text-[10px] font-bold uppercase">
-              VOTED: {votedNextBug.replace('_', ' ')}
-            </span>
-          )}
-        </div>
-
-        <div className="divide-y divide-black">
-          {BUG_OPTIONS.map((opt) => {
-            const count = nextBugVotes[opt.id] || 0;
-            const pct = totalNextVotes > 0 ? Math.round((count / totalNextVotes) * 100) : 0;
-            const isVoted = votedNextBug === opt.id;
-
-            return (
+              {/* Player 2 Option */}
               <button
-                key={opt.id}
                 type="button"
-                disabled={Boolean(votedNextBug)}
-                onClick={() => handleVoteNextBug(opt.id)}
-                className={`w-full p-2.5 text-left transition-colors relative flex items-center justify-between ${
-                  isVoted
-                    ? 'bg-black text-white font-extrabold'
-                    : votedNextBug
-                      ? 'bg-white opacity-60 cursor-not-allowed'
-                      : 'bg-white hover:bg-black hover:text-white cursor-pointer'
+                disabled={Boolean(predictedWinner) || room.status !== 'ACTIVE'}
+                onClick={() => handlePredictWinner('player_2')}
+                className={`p-3 text-left transition-colors flex flex-col justify-between ${
+                  predictedWinner === 'player_2'
+                    ? 'bg-[#CCFF00] text-black font-extrabold'
+                    : predictedWinner
+                      ? 'bg-paper opacity-50 cursor-not-allowed'
+                      : 'bg-white hover:bg-black hover:text-white cursor-pointer active:scale-[0.99]'
                 }`}
               >
-                <div
-                  className="absolute inset-y-0 left-0 bg-[#CCFF00]/20 pointer-events-none"
-                  style={{ width: `${pct}%` }}
-                />
-                <div className="relative min-w-0 pr-2">
-                  <div className="font-bold text-xs">{opt.label}</div>
-                  <div className="font-hand text-[10px] opacity-75 truncate">{opt.hint}</div>
+                <div className="flex items-center gap-2">
+                  <DoodlePlayer2 size={28} />
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-mono opacity-60">PLAYER 2</div>
+                    <div className="font-bold text-xs sm:text-sm truncate">{p2?.name || 'Player 2'}</div>
+                  </div>
                 </div>
-                <div className="relative font-mono text-xs font-bold shrink-0">
-                  {pct}% ({count})
+                <div className="mt-3 flex justify-between items-end">
+                  <span className="text-[10px] font-mono font-bold">{b} bets</span>
+                  <span className="font-mono text-sm font-extrabold">{100 - aPct}%</span>
                 </div>
               </button>
-            );
-          })}
-        </div>
-      </section>
+            </div>
+
+            {/* Live Tug-of-War Bar */}
+            <div className="border-t-2 border-black p-2.5 bg-paper">
+              <div className="flex justify-between text-[11px] font-bold mb-1">
+                <span>{p1?.name || 'PLAYER 1'}: {aPct}%</span>
+                <span className="font-hand text-[10px] text-black/60">CROWD TALLY</span>
+                <span>{p2?.name || 'PLAYER 2'}: {100 - aPct}%</span>
+              </div>
+              <div className="flex h-3.5 sm:h-4 border border-black bg-white shadow-[1px_1px_0px_#000]">
+                <div className="bg-black transition-all duration-300" style={{ width: `${aPct}%` }} />
+                <div className="hatch flex-1" />
+              </div>
+            </div>
+          </section>
+
+          {/* 2. BUG GUESSING (+50 PTS) */}
+          <section className="border-b-2 border-black bg-white">
+            <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
+              <div>
+                <span className="font-heading font-extrabold text-xs tracking-wider">2. GUESS THE BUG TYPE</span>
+                <span className="ml-2 font-hand text-xs text-black/70">+50 PTS</span>
+              </div>
+              {guessedBug && (
+                <span className="bg-[#CCFF00] border border-black text-black px-2 py-0.5 text-[10px] font-bold uppercase shadow-[1px_1px_0px_#000]">
+                  LOCKED IN: {guessedBug.replace('_', ' ')}
+                </span>
+              )}
+            </div>
+
+            <div className="divide-y divide-black">
+              {BUG_OPTIONS.map((opt) => {
+                const count = bugGuesses[opt.id] || 0;
+                const pct = totalBugGuesses > 0 ? Math.round((count / totalBugGuesses) * 100) : 0;
+                const isSelected = guessedBug === opt.id;
+
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={Boolean(guessedBug) || room.status !== 'ACTIVE'}
+                    onClick={() => handleGuessBug(opt.id)}
+                    className={`w-full p-2.5 text-left transition-colors relative flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-[#CCFF00] text-black font-extrabold'
+                        : guessedBug
+                          ? 'bg-white opacity-60 cursor-not-allowed'
+                          : 'bg-white hover:bg-black hover:text-white cursor-pointer'
+                    }`}
+                  >
+                    <div
+                      className="absolute inset-y-0 left-0 bg-black/5 pointer-events-none"
+                      style={{ width: `${pct}%` }}
+                    />
+                    <div className="relative min-w-0 pr-2">
+                      <div className="font-bold text-xs">{opt.label}</div>
+                      <div className="font-hand text-[10px] opacity-75 truncate">{opt.hint}</div>
+                    </div>
+                    <div className="relative font-mono text-xs font-bold shrink-0">
+                      {pct}% ({count})
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* 3. VOTE NEXT ROUND BUG CATEGORY */}
+          <section className="border-b-2 border-black bg-white">
+            <div className="px-3 py-2 border-b-2 border-black flex justify-between items-center bg-paper">
+              <div>
+                <span className="font-heading font-extrabold text-xs tracking-wider">3. VOTE NEXT ROUND'S BUG</span>
+                <span className="ml-2 font-hand text-xs text-black/70">crowd power</span>
+              </div>
+              {votedNextBug && (
+                <span className="bg-black text-white px-2 py-0.5 text-[10px] font-bold uppercase">
+                  VOTED: {votedNextBug.replace('_', ' ')}
+                </span>
+              )}
+            </div>
+
+            <div className="divide-y divide-black">
+              {BUG_OPTIONS.map((opt) => {
+                const count = nextBugVotes[opt.id] || 0;
+                const pct = totalNextVotes > 0 ? Math.round((count / totalNextVotes) * 100) : 0;
+                const isVoted = votedNextBug === opt.id;
+
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={Boolean(votedNextBug)}
+                    onClick={() => handleVoteNextBug(opt.id)}
+                    className={`w-full p-2.5 text-left transition-colors relative flex items-center justify-between ${
+                      isVoted
+                        ? 'bg-black text-white font-extrabold'
+                        : votedNextBug
+                          ? 'bg-white opacity-60 cursor-not-allowed'
+                          : 'bg-white hover:bg-black hover:text-white cursor-pointer'
+                    }`}
+                  >
+                    <div
+                      className="absolute inset-y-0 left-0 bg-[#CCFF00]/20 pointer-events-none"
+                      style={{ width: `${pct}%` }}
+                    />
+                    <div className="relative min-w-0 pr-2">
+                      <div className="font-bold text-xs">{opt.label}</div>
+                      <div className="font-hand text-[10px] opacity-75 truncate">{opt.hint}</div>
+                    </div>
+                    <div className="relative font-mono text-xs font-bold shrink-0">
+                      {pct}% ({count})
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
 
       {/* Local floating reactions */}
       {localEmotes.map((e) => (
