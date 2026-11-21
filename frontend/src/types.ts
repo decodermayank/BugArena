@@ -44,6 +44,22 @@ export interface Winner {
   total: number;
 }
 
+export interface LeaderboardEntry {
+  id: string;
+  name: string;
+  score: number;
+  round_points: number;
+  correct_winner?: boolean;
+  correct_bug?: boolean;
+}
+
+export interface CrowdCallout {
+  headline: string;
+  subtitle: string;
+  winner_pct: number;
+  bug_pct: number;
+}
+
 export interface RoomState {
   type: 'ROOM_STATE';
   room_code: string;
@@ -53,7 +69,10 @@ export interface RoomState {
   players: PlayerState[];
   spectator_count: number;
   predictions: Record<PlayerSlot, number>;
+  bug_guesses: Record<BugCategory, number>;
   next_bug_votes: Record<BugCategory, number>;
+  leaderboard: LeaderboardEntry[];
+  crowd_callout: CrowdCallout | null;
   event_log: string[];
   winner: Winner | null;
   finish_reason: 'all_tests' | 'timeout' | null;
@@ -82,6 +101,7 @@ export type ClientEvent =
   | { type: 'PROGRESS_UPDATE'; passed: number; total: number; error: string | null }
   | { type: 'SUBMIT_WIN'; code: string; passed: number; total: number }
   | { type: 'SPECTATOR_VOTE'; target: PlayerSlot }
+  | { type: 'BUG_GUESS'; category: BugCategory }
   | { type: 'NEXT_BUG_VOTE'; category: BugCategory }
   | { type: 'EMOTE_REACTION'; emote: string };
 

@@ -147,6 +147,11 @@ async def websocket_endpoint(
                 if target:
                     await room_manager.handle_spectator_vote(room_code_upper, client_id, target)
 
+            elif event_type == "BUG_GUESS":
+                category = data.get("category")
+                if category:
+                    await room_manager.handle_bug_guess(room_code_upper, client_id, category)
+
             elif event_type == "NEXT_BUG_VOTE":
                 category = data.get("category")
                 if category:

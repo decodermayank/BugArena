@@ -138,6 +138,7 @@ export function useWebSocket({ roomCode, role, nickname = '' }: Options) {
     sendProgress: (passed: number, total: number, err: string | null) =>
       send({ type: 'PROGRESS_UPDATE', passed, total, error: err }),
     votePrediction: (target: PlayerSlot) => send({ type: 'SPECTATOR_VOTE', target }),
+    guessBug: (category: BugCategory) => send({ type: 'BUG_GUESS', category }),
     voteNextBug: (category: BugCategory) => send({ type: 'NEXT_BUG_VOTE', category }),
   };
 }

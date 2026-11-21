@@ -59,145 +59,158 @@ function Progress({ player, total, slot }: { player?: PlayerState; total: number
           </div>
         ))}
       </div>
-
-      <div className="text-[11px] sm:text-xs h-4 truncate font-bold text-red-600">
-        {player?.error ? `[!] ${player.error.split('\n').pop()}` : player && !player.connected ? '[!] DISCONNECTED' : ''}
-      </div>
     </div>
   );
 }
 
 export default function ArenaView() {
-  const { roomCode = '' } = useParams();
-  const s = useWebSocket({ roomCode, role: 'projector', nickname: 'Projector' });
+  const { roomCode = '' } = useParams<{ roomCode: string }>();
+  const s = useWebSocket({ roomCode, role: 'projector' });
   const room = s.roomState;
 
-  // Comic Banner State
+  // Visual effects state
   const [showFightBanner, setShowFightBanner] = useState(false);
   const [fightBannerTitle, setFightBannerTitle] = useState('');
-  const lastRoundRef = useRef<number>(-1);
-  const lastStatusRef = useRef<string>('');
-
-  // Pow test squash floaters
   const [powAlerts, setPowAlerts] = useState<PowAlert[]>([]);
-  const prevP1Score = useRef<number>(0);
-  const prevP2Score = useRef<number>(0);
-
-  // Floating spectator reactions
   const [floatingEmotes, setFloatingEmotes] = useState<FloatingEmote[]>([]);
-  const nextEmoteId = useRef(1);
 
-  // Victory fireworks trigger
-  const celebratedVictory = useRef(false);
+  // Sound & event tracking refs
+  const prevStatusRef = useRef<string | null>(null);
+  const prevP1ScoreRef = useRef<number>(0);
+  const prevP2ScoreRef = useRef<number>(0);
+  const prevLogLenRef = useRef<number>(0);
+  const prevRoundRef = useRef<number>(1);
+  const countdownPlayedRef = useRef<Set<number>>(new Set());
 
-  // Sound clock ticker for last 15s
-  const lastClockTick = useRef<number>(-1);
-
-  // Trigger Comic Fight Banner on start
+  // 1. Match Start / Next Round sound & Manga "FIGHT!" Screen Wipe
   useEffect(() => {
     if (!room) return;
-    const isNewRound = room.round !== lastRoundRef.current;
-    const justBecameActive = room.status === 'ACTIVE' && lastStatusRef.current !== 'ACTIVE';
 
-    if ((isNewRound || justBecameActive) && room.status === 'ACTIVE') {
-      lastRoundRef.current = room.round;
-      lastStatusRef.current = room.status;
+    if (
+      (prevStatusRef.current === 'WAITING' || prevStatusRef.current === 'FINISHED') &&
+      room.status === 'ACTIVE'
+    ) {
+      soundFx.playFightGong();
       setFightBannerTitle(`ROUND ${room.round}: ${room.problem.title.toUpperCase()}`);
       setShowFightBanner(true);
-      soundFx.playFightGong();
-
-      const timer = setTimeout(() => {
-        setShowFightBanner(false);
-      }, 1900);
+      const timer = setTimeout(() => setShowFightBanner(false), 2400);
       return () => clearTimeout(timer);
     }
-    lastStatusRef.current = room.status;
-  }, [room]);
+    prevStatusRef.current = room.status;
+  }, [room?.status, room?.round, room?.problem.title]);
 
-  // Track player score improvements to trigger comic POW stamps
+  // Reset countdown tracker on round change
+  useEffect(() => {
+    if (!room) return;
+    if (room.round !== prevRoundRef.current) {
+      prevRoundRef.current = room.round;
+      countdownPlayedRef.current.clear();
+      prevP1ScoreRef.current = 0;
+      prevP2ScoreRef.current = 0;
+    }
+  }, [room?.round]);
+
+  // 2. Score increases & Comic POW stamps
   useEffect(() => {
     if (!room || room.status !== 'ACTIVE') return;
-    const [p1, p2] = room.players;
-    const total = room.problem.test_cases.length;
 
-    if (p1 && p1.passed > prevP1Score.current) {
+    const [p1, p2] = room.players;
+    const currentP1 = p1?.passed ?? 0;
+    const currentP2 = p2?.passed ?? 0;
+
+    if (currentP1 > prevP1ScoreRef.current) {
       soundFx.playPass();
-      const id = Date.now() + Math.random();
+      const alertId = Date.now() + Math.random();
       setPowAlerts((prev) => [
         ...prev,
         {
-          id,
-          text: `💥 POW! ${p1.name.toUpperCase()} SQUASHED A TEST!`,
-          sub: `${p1.passed}/${total} TESTS PASSING`,
+          id: alertId,
+          text: 'POW! TEST PASSED',
+          sub: `${p1?.name ?? 'P1'} +1`,
           x: 20 + Math.random() * 20,
+          y: 30 + Math.random() * 20,
+        },
+      ]);
+      setTimeout(() => {
+        setPowAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      }, 1500);
+    }
+
+    if (currentP2 > prevP2ScoreRef.current) {
+      soundFx.playPass();
+      const alertId = Date.now() + Math.random();
+      setPowAlerts((prev) => [
+        ...prev,
+        {
+          id: alertId,
+          text: 'BAM! TEST PASSED',
+          sub: `${p2?.name ?? 'P2'} +1`,
+          x: 60 + Math.random() * 20,
           y: 40 + Math.random() * 20,
         },
       ]);
       setTimeout(() => {
-        setPowAlerts((prev) => prev.filter((a) => a.id !== id));
-      }, 2500);
+        setPowAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      }, 1500);
     }
 
-    if (p2 && p2.passed > prevP2Score.current) {
-      soundFx.playPass();
-      const id = Date.now() + Math.random();
-      setPowAlerts((prev) => [
-        ...prev,
-        {
-          id,
-          text: `💥 BAM! ${p2.name.toUpperCase()} SQUASHED A TEST!`,
-          sub: `${p2.passed}/${total} TESTS PASSING`,
-          x: 55 + Math.random() * 20,
-          y: 45 + Math.random() * 20,
-        },
-      ]);
-      setTimeout(() => {
-        setPowAlerts((prev) => prev.filter((a) => a.id !== id));
-      }, 2500);
-    }
+    prevP1ScoreRef.current = currentP1;
+    prevP2ScoreRef.current = currentP2;
+  }, [room?.players, room?.status]);
 
-    prevP1Score.current = p1?.passed ?? 0;
-    prevP2Score.current = p2?.passed ?? 0;
-  }, [room]);
-
-  // Victory celebration
+  // 3. Victory sound & Confetti shower
   useEffect(() => {
-    if (room?.status === 'FINISHED' && room.winner && !celebratedVictory.current) {
-      celebratedVictory.current = true;
-      soundFx.playVictory();
-      confetti({
-        particleCount: 80,
-        spread: 90,
-        origin: { y: 0.5 },
-        colors: ['#000000', '#ffffff', '#888888'],
-      });
-    } else if (room?.status === 'ACTIVE') {
-      celebratedVictory.current = false;
-    }
-  }, [room]);
-
-  // Audio countdown ticker in last 15 seconds
-  useEffect(() => {
-    if (room?.status === 'ACTIVE' && s.secondsLeft <= 15 && s.secondsLeft > 0) {
-      if (s.secondsLeft !== lastClockTick.current) {
-        lastClockTick.current = s.secondsLeft;
-        soundFx.playClockTick();
+    if (room?.status === 'FINISHED') {
+      if (room.winner) {
+        soundFx.playVictory();
+        confetti({
+          particleCount: 150,
+          spread: 90,
+          origin: { y: 0.5 },
+          colors: ['#000000', '#FFFFFF', '#00FF66', '#FFB800'],
+        });
+      } else {
+        soundFx.playFail();
       }
     }
-  }, [room, s.secondsLeft]);
+  }, [room?.status, room?.winner]);
 
-  // Incoming spectator reaction
+  // 4. Dramatic Ticking Countdown in final 5 seconds
   useEffect(() => {
-    if (s.lastEmote) {
-      soundFx.playEmotePop();
-      const id = nextEmoteId.current++;
-      const x = 15 + Math.random() * 70;
-      setFloatingEmotes((prev) => [...prev, { id, emote: s.lastEmote!.emote, x }]);
-      setTimeout(() => {
-        setFloatingEmotes((prev) => prev.filter((e) => e.id !== id));
-      }, 2800);
+    if (!room || room.status !== 'ACTIVE') return;
+
+    const secs = s.secondsLeft;
+    if (secs > 0 && secs <= 5 && !countdownPlayedRef.current.has(secs)) {
+      countdownPlayedRef.current.add(secs);
+      soundFx.playClockTick();
     }
+  }, [room?.status, s.secondsLeft]);
+
+  // 5. Incoming Spectator Emote Floaters
+  useEffect(() => {
+    if (!s.lastEmote) return;
+    const emoteId = Date.now() + Math.random();
+    const xPos = 15 + Math.random() * 70;
+    setFloatingEmotes((prev) => [...prev, { id: emoteId, emote: s.lastEmote!.emote, x: xPos }]);
+
+    soundFx.playEmotePop();
+
+    const t = setTimeout(() => {
+      setFloatingEmotes((prev) => prev.filter((item) => item.id !== emoteId));
+    }, 2200);
+    return () => clearTimeout(t);
   }, [s.lastEmote]);
+
+  // 6. Match Event Log Audio Cues
+  useEffect(() => {
+    if (!room) return;
+    if (room.event_log.length > prevLogLenRef.current) {
+      if (prevLogLenRef.current > 0) {
+        soundFx.playThump();
+      }
+      prevLogLenRef.current = room.event_log.length;
+    }
+  }, [room?.event_log]);
 
   if (s.error) {
     return (
@@ -221,12 +234,16 @@ export default function ArenaView() {
   const joinUrl = `${window.location.origin}/join/${room.room_code}`;
   const total = room.problem.test_cases.length;
   const [p1, p2] = room.players;
-  const a = room.predictions.player_1;
-  const b = room.predictions.player_2;
+  const a = room.predictions?.player_1 ?? 0;
+  const b = room.predictions?.player_2 ?? 0;
   const aPct = a + b === 0 ? 50 : Math.round((a / (a + b)) * 100);
   const ticker = room.event_log.slice(-6).reverse();
   const low = room.status === 'ACTIVE' && s.secondsLeft <= 30;
-  const bugVotes = room.next_bug_votes;
+
+  const bugGuesses = room.bug_guesses || { off_by_one: 0, inverted_condition: 0, arithmetic: 0 };
+  const totalBugGuesses = Object.values(bugGuesses).reduce((x, y) => x + y, 0);
+
+  const bugVotes = room.next_bug_votes || { off_by_one: 0, inverted_condition: 0, arithmetic: 0 };
   const labels: Record<string, string> = {
     off_by_one: 'OFF-BY-ONE',
     inverted_condition: 'INVERTED LOGIC',
@@ -328,16 +345,16 @@ export default function ArenaView() {
           </div>
         </section>
 
-        {/* Right Column: Live Ticker & Sabotage Bug Votes */}
+        {/* Right Column: Live Ticker, Bug Guesses & Sabotage Votes */}
         <section className="flex flex-col min-h-0 bg-white">
           <div className="border-b-2 border-black px-4 py-2 font-heading font-extrabold text-xs sm:text-sm bg-[#f5f5f5]">
             LIVE ARENA TICKER
           </div>
-          <ul className="flex-1 min-h-[140px] max-h-52 lg:max-h-none overflow-y-auto text-xs">
+          <ul className="flex-1 min-h-[120px] max-h-48 lg:max-h-none overflow-y-auto text-xs">
             {ticker.map((line, i) => (
               <li
                 key={`${room.event_log.length - i}`}
-                className={`border-b border-black/20 px-4 py-2 font-mono ${
+                className={`border-b border-black/20 px-4 py-1.5 font-mono leading-tight ${
                   i === 0 ? 'bg-black text-white font-bold' : 'text-black/80'
                 }`}
               >
@@ -347,14 +364,34 @@ export default function ArenaView() {
             ))}
           </ul>
 
+          {/* Live Crowd Bug Guessing Tally */}
+          <div className="border-t-2 border-black px-4 py-2 font-heading font-extrabold text-xs bg-black text-white flex justify-between items-center tracking-wider">
+            <span>CROWD BUG GUESSES</span>
+            <span className="text-[#CCFF00] font-mono text-[11px]">{totalBugGuesses} votes</span>
+          </div>
+          {Object.keys(labels).map((k) => {
+            const count = bugGuesses[k as keyof typeof bugGuesses] ?? 0;
+            const pct = totalBugGuesses > 0 ? Math.round((count / totalBugGuesses) * 100) : 0;
+            return (
+              <div key={k} className="border-t border-black/20 px-4 py-1.5 text-xs relative bg-white">
+                <div className="absolute inset-y-0 left-0 bg-[#CCFF00]/30" style={{ width: `${pct}%` }} />
+                <div className="relative flex justify-between font-bold">
+                  <span>{labels[k]}</span>
+                  <span className="font-mono">{pct}% ({count})</span>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Audience Next Round Bug Votes */}
           <div className="border-t-2 border-black px-4 py-2 font-heading font-extrabold text-xs sm:text-sm bg-[#f5f5f5]">
             AUDIENCE SABOTAGE VOTES
           </div>
           <div className="divide-y border-t border-black/20">
             {Object.keys(labels).map((k) => (
-              <div key={k} className="px-4 py-2 text-xs flex justify-between font-bold items-center">
+              <div key={k} className="px-4 py-1.5 text-xs flex justify-between font-bold items-center">
                 <span>{labels[k]}</span>
-                <span className="border border-black px-2 py-0.5 bg-paper">
+                <span className="border border-black px-2 py-0.5 bg-paper font-mono">
                   {bugVotes[k as keyof typeof bugVotes] ?? 0}
                 </span>
               </div>
@@ -397,7 +434,6 @@ export default function ArenaView() {
 
           {/* Physical Tug-of-War Rope */}
           <div className="relative border-2 border-black h-8 w-full bg-paper flex items-center overflow-hidden shadow-[2px_2px_0px_#000]">
-            {/* Split fills */}
             <div
               className="h-full bg-black transition-all duration-500 ease-out flex items-center justify-end pr-2"
               style={{ width: `${aPct}%` }}
@@ -408,7 +444,6 @@ export default function ArenaView() {
               <span className="text-[10px] font-bold text-black font-mono">{100 - aPct}%</span>
             </div>
 
-            {/* Central Tug Knot Marker */}
             <div
               className="absolute top-0 bottom-0 w-2.5 bg-red-600 border-x border-black transition-all duration-500 ease-out shadow-[0px_0px_6px_#000]"
               style={{ left: `calc(${aPct}% - 5px)` }}
@@ -420,7 +455,6 @@ export default function ArenaView() {
       {/* Comic-Book "FIGHT!" Screen Wipe Banner */}
       {showFightBanner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none overflow-hidden bg-black/40">
-          {/* Manga Radial Speed Lines */}
           <div
             className="absolute inset-0 opacity-20"
             style={{
@@ -464,37 +498,96 @@ export default function ArenaView() {
         </div>
       ))}
 
-      {/* Victory Celebration Modal */}
+      {/* Victory Celebration & Leaderboard Modal */}
       {room.status === 'FINISHED' && (
-        <div className="absolute inset-0 bg-[#FAFAFA]/95 flex flex-col items-center justify-start sm:justify-center gap-3 sm:gap-4 text-center z-30 border-2 border-black m-2 sm:m-6 p-4 sm:p-8 overflow-y-auto shadow-[6px_6px_0px_#000]">
+        <div className="absolute inset-0 bg-[#FAFAFA]/95 flex flex-col items-center justify-start sm:justify-center gap-3 text-center z-30 border-2 border-black m-2 sm:m-6 p-4 sm:p-8 overflow-y-auto shadow-[6px_6px_0px_#000]">
           <div className="font-hand text-base sm:text-xl font-bold">
             {room.finish_reason === 'timeout' ? "TIME'S UP!" : 'BUG SQUASHED!'}
           </div>
           <div className="font-display italic text-5xl sm:text-7xl md:text-8xl leading-none">
-            {room.winner ? `${room.winner.name} wins!` : 'Draw'}
+            {room.winner ? `${room.winner.name} wins!` : 'Draw / Stalemate'}
           </div>
+
           {room.winner && (
             <div className="font-heading font-extrabold text-sm sm:text-lg bg-black text-white px-4 py-1">
               {room.winner.passed}/{room.winner.total} tests passing in {room.winner.completion_time}s
             </div>
           )}
-          {room.problem.description_bug && (
-            <div className="border-2 border-black p-3 sm:p-4 text-xs sm:text-sm max-w-2xl text-left bg-white shadow-[2px_2px_0px_#000]">
-              <span className="font-bold">THE BUG: </span>
-              {room.problem.description_bug}
+
+          {/* Crowd vs Duelists Callout Banner */}
+          {room.crowd_callout && (
+            <div className="bg-[#CCFF00] text-black border-2 border-black px-4 sm:px-6 py-2.5 sm:py-3.5 max-w-2xl w-full text-center mt-3">
+              <div className="font-heading font-extrabold text-lg sm:text-2xl tracking-tight leading-tight uppercase">
+                ⚡ {room.crowd_callout.headline}
+              </div>
+              <div className="font-hand text-xs sm:text-sm mt-1">
+                {room.crowd_callout.subtitle}
+              </div>
+              <div className="text-[11px] sm:text-xs font-bold mt-2 pt-2 border-t border-black/30 flex justify-around font-mono">
+                <span>CROWD WINNER ACCURACY: {room.crowd_callout.winner_pct}%</span>
+                <span>BUG GUESS ACCURACY: {room.crowd_callout.bug_pct}%</span>
+              </div>
             </div>
           )}
-          <div className="flex items-center gap-3 pt-2">
+
+          {/* Top Crowd Predictors Leaderboard */}
+          <div className="border-2 border-black bg-white max-w-2xl w-full text-left mt-3 shadow-[2px_2px_0px_#000]">
+            <div className="border-b-2 border-black px-4 py-2 bg-black text-white font-heading font-extrabold text-xs sm:text-sm flex justify-between items-center tracking-wider uppercase">
+              <span>TOP CROWD PREDICTORS</span>
+              <span className="font-hand font-normal text-xs text-[#CCFF00]">LEADERBOARD</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x border-black bg-white">
+              {room.leaderboard && room.leaderboard.length > 0 ? (
+                room.leaderboard.slice(0, 6).map((entry, idx) => (
+                  <div key={entry.id || idx} className="flex items-center justify-between px-3 sm:px-4 py-2 text-xs font-bold border-b border-black">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`w-6 h-6 flex items-center justify-center border border-black text-xs shrink-0 ${
+                          idx === 0 ? 'bg-[#CCFF00] text-black font-extrabold' : 'bg-paper text-black'
+                        }`}
+                      >
+                        #{idx + 1}
+                      </span>
+                      <span className="truncate max-w-[120px] sm:max-w-[140px]">{entry.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {entry.round_points > 0 && (
+                        <span className="text-[10px] bg-[#CCFF00] text-black px-1 border border-black font-mono">
+                          +{entry.round_points}
+                        </span>
+                      )}
+                      <span className="font-mono text-xs sm:text-sm">{entry.score} PTS</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-2 text-center py-3 font-hand text-xs text-black/60">
+                  No crowd predictions recorded for this round.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bug explanation */}
+          {room.problem.description_bug && (
+            <div className="border-2 border-black p-3 sm:p-4 text-xs sm:text-sm max-w-2xl text-left bg-white shadow-[2px_2px_0px_#000] mt-2">
+              <span className="font-bold">THE BUG: </span>
+              <span>{room.problem.description_bug}</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 pt-3">
             <InkArrow width={80} className="hidden sm:block" />
             <button
               className="btn-ink px-8 sm:px-12 py-3 sm:py-4 text-base sm:text-xl cursor-pointer shadow-[3px_3px_0px_#000]"
               onClick={s.startNextRound}
             >
-              NEXT ROUND →
+              LAUNCH NEXT ROUND →
             </button>
           </div>
+
           <div className="font-hand text-xs sm:text-sm text-black/75">
-            sabotage votes:{' '}
+            spectator vote for next round:{' '}
             {Object.keys(labels)
               .map((k) => `${labels[k]}: ${bugVotes[k as keyof typeof bugVotes] ?? 0}`)
               .join(' | ')}
