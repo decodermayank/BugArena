@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { BugCategory, PlayerSlot } from '../types';
 import { formatClock } from '../hooks/useWebSocket';
 import type { RoomSession } from '../hooks/useWebSocket';
@@ -36,6 +37,7 @@ function Bar({ passed, total }: { passed: number; total: number }) {
 }
 
 export default function SpectatorView({ session }: { session: RoomSession }) {
+  const navigate = useNavigate();
   const { roomState: room, secondsLeft, votePrediction, guessBug, voteNextBug, sendEmote } = session;
   const round = room?.round ?? 1;
   const roomCode = room?.room_code ?? '';
@@ -118,11 +120,30 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
     <div className="min-h-dvh bg-[#FAFAFA] text-black border-x-0 sm:border-x-2 border-black max-w-xl mx-auto flex flex-col relative overflow-x-hidden select-none pb-24">
       {/* Top Header */}
       <header className="border-b-2 border-black flex items-stretch justify-between bg-white">
-        <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2">
-          <span className="font-heading font-extrabold text-sm sm:text-lg">BUGARENA</span>
-          <DoodleBug size={18} className="shrink-0 sm:w-5 sm:h-5" />
-          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-black text-white">CROWD</span>
+        <div className="flex items-stretch min-w-0">
+          {/* Back Button to Home Page */}
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="border-r-2 border-black px-2.5 sm:px-3.5 py-2 flex items-center gap-1.5 text-xs font-bold bg-white hover:bg-black hover:text-white transition-colors cursor-pointer shrink-0 group select-none"
+            title="Leave room and return to Home Page"
+          >
+            <span className="font-extrabold text-sm transition-transform group-hover:-translate-x-0.5">←</span>
+            <span className="font-mono text-[11px] sm:text-xs">HOME</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 cursor-pointer hover:bg-black/5 transition-colors text-left"
+            title="BugArena Home"
+          >
+            <span className="font-heading font-extrabold text-sm sm:text-lg">BUGARENA</span>
+            <DoodleBug size={18} className="shrink-0 sm:w-5 sm:h-5" />
+            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-black text-white">CROWD</span>
+          </button>
         </div>
+
         <div className="flex items-center">
           <div className="flex items-center gap-1.5 mr-2">
             <SoundToggle />
@@ -369,6 +390,17 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Action to leave or return to home */}
+              <div className="p-3 pt-0">
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="btn-paper w-full py-2.5 text-xs font-bold hover:bg-black hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000]"
+                >
+                  <span>← LEAVE ROOM & RETURN HOME</span>
+                </button>
               </div>
             </section>
           )}

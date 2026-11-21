@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import type { BeforeMount } from '@monaco-editor/react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useWebSocket, formatClock } from '../hooks/useWebSocket';
 import type { RoomSession } from '../hooks/useWebSocket';
 import { usePyodide } from '../hooks/usePyodide';
@@ -37,11 +37,19 @@ const defineTheme: BeforeMount = (monaco) => {
 };
 
 function Gate({ text }: { text: string }) {
+  const navigate = useNavigate();
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-paper p-4">
+    <div className="min-h-dvh flex flex-col items-center justify-center bg-paper p-4 gap-3">
       <div className="border-2 border-black bg-white px-6 py-4 font-bold text-center shadow-[4px_4px_0px_#000]">
         [!] {text}
       </div>
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        className="btn-paper px-4 py-2 text-xs font-bold cursor-pointer hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0px_#000]"
+      >
+        ← BACK TO HOME
+      </button>
     </div>
   );
 }
