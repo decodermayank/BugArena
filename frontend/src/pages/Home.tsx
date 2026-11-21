@@ -8,6 +8,7 @@ import type { AvatarPresetId } from '../components/Doodles';
 import ArcadeCodeInput from '../components/ArcadeCodeInput';
 import EmoteJar from '../components/EmoteJar';
 import SoundToggle from '../components/SoundToggle';
+import { CursorToggle } from '../components/CustomCursor';
 import { soundFx } from '../utils/soundFx';
 import type { CreateRoomResponse } from '../types';
 
@@ -134,8 +135,9 @@ export default function Home() {
             BUGARENA
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <SoundToggle />
+          <CursorToggle />
           <div className="flex items-center gap-1.5 sm:gap-2 border-[1.5px] border-black px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold tracking-wider bg-white">
             <span
               className={`inline-block w-2 h-2 sm:w-2.5 sm:h-2.5 shrink-0 ${
@@ -148,8 +150,8 @@ export default function Home() {
       </header>
 
       {/* Main Body */}
-      <main className="relative z-10 flex-1 min-h-0 w-full overflow-y-auto px-3 sm:px-6 py-3 sm:py-6 pointer-events-none">
-        <div className="w-full max-w-[740px] mx-auto my-auto flex flex-col items-center gap-3 sm:gap-5 pb-20 sm:pb-8 pointer-events-auto">
+      <main className="relative z-10 flex-1 min-h-0 w-full overflow-y-auto px-3 sm:px-6 py-3 sm:py-6">
+        <div className="w-full max-w-[740px] mx-auto my-auto flex flex-col items-center gap-3 sm:gap-5 pb-20 sm:pb-8">
           {/* Title */}
           <div className="text-center">
             <h1 className="font-heading font-extrabold text-3xl sm:text-5xl md:text-6xl leading-none tracking-tight">

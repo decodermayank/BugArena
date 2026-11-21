@@ -6,6 +6,7 @@ import confetti from 'canvas-confetti';
 import { usePyodide } from '../hooks/usePyodide';
 import { DoodleBug, InkArrow } from '../components/Doodles';
 import SoundToggle from '../components/SoundToggle';
+import { CursorToggle } from '../components/CustomCursor';
 import { soundFx } from '../utils/soundFx';
 import type { TestCase, TestRunResult } from '../types';
 
@@ -165,7 +166,7 @@ const defineTheme: BeforeMount = (monaco) => {
       'editorLineNumber.activeForeground': '#000000',
       'editor.lineHighlightBackground': '#00000010',
       'editor.selectionBackground': '#00000030',
-      'editorCursor.foreground': '#000000',
+      'editorCursor.foreground': '#00FF66',
       'editorIndentGuide.background1': '#00000020',
     },
   });
@@ -277,8 +278,9 @@ export default function PracticeView() {
           ⏱ {formatTime(seconds)}
         </div>
 
-        <div className="bl px-2 flex items-center shrink-0">
+        <div className="bl px-2 flex items-center gap-1 shrink-0">
           <SoundToggle />
+          <CursorToggle />
         </div>
 
         <div className="bl px-2 sm:px-3 flex items-center gap-1.5 text-xs font-bold shrink-0">
@@ -462,6 +464,10 @@ export default function PracticeView() {
                 renderLineHighlight: 'line',
                 padding: { top: 12 },
                 automaticLayout: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
+                cursorStyle: 'line',
+                cursorWidth: 2,
               }}
             />
           </div>

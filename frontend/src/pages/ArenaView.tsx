@@ -5,6 +5,7 @@ import confetti from 'canvas-confetti';
 import { useWebSocket, formatClock } from '../hooks/useWebSocket';
 import { Crowd, DoodleBug, DoodlePlayer1, DoodlePlayer2, InkArrow } from '../components/Doodles';
 import SoundToggle from '../components/SoundToggle';
+import { CursorToggle } from '../components/CustomCursor';
 import { soundFx } from '../utils/soundFx';
 import type { PlayerState } from '../types';
 
@@ -244,8 +245,9 @@ export default function ArenaView() {
           </span>
         </div>
 
-        <div className="border-l-2 border-black px-3 flex items-center shrink-0">
+        <div className="border-l-2 border-black px-2 sm:px-3 flex items-center gap-1.5 shrink-0">
           <SoundToggle />
+          <CursorToggle />
         </div>
 
         <div className="border-l-2 border-black px-4 sm:px-6 flex items-center font-bold text-xs sm:text-sm shrink-0">

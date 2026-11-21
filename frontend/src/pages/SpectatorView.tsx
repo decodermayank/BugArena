@@ -4,6 +4,7 @@ import { formatClock } from '../hooks/useWebSocket';
 import type { RoomSession } from '../hooks/useWebSocket';
 import { Crowd, DoodlePlayer1, DoodlePlayer2, DoodleBug } from '../components/Doodles';
 import SoundToggle from '../components/SoundToggle';
+import { CursorToggle } from '../components/CustomCursor';
 import { soundFx } from '../utils/soundFx';
 
 const BUG_OPTIONS: { id: BugCategory; label: string; hint: string }[] = [
@@ -96,7 +97,10 @@ export default function SpectatorView({ session }: { session: RoomSession }) {
           <span className="text-[10px] font-bold px-1.5 py-0.5 bg-black text-white">CROWD</span>
         </div>
         <div className="flex items-center">
-          <SoundToggle className="mr-2" />
+          <div className="flex items-center gap-1.5 mr-2">
+            <SoundToggle />
+            <CursorToggle />
+          </div>
           <div className="border-l-2 border-black px-3 py-2 flex items-center font-mono font-bold text-xs sm:text-sm">
             ROOM {room.room_code}
           </div>

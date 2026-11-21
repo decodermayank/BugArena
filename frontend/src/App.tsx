@@ -3,10 +3,12 @@ import Home from './pages/Home';
 import ArenaView from './pages/ArenaView';
 import PracticeView from './pages/PracticeView';
 import { JoinRoute, SpectateRoute } from './pages/PlayerView';
+import CustomCursor from './components/CustomCursor';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <CustomCursor />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/practice" element={<PracticeView />} />

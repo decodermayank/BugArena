@@ -9,6 +9,7 @@ import type { RequestedRole, TestRunResult } from '../types';
 import SpectatorView from './SpectatorView';
 import { DoodleBug, DoodlePlayer1, DoodlePlayer2, InkArrow } from '../components/Doodles';
 import SoundToggle from '../components/SoundToggle';
+import { CursorToggle } from '../components/CustomCursor';
 import { soundFx } from '../utils/soundFx';
 
 const defineTheme: BeforeMount = (monaco) => {
@@ -29,7 +30,7 @@ const defineTheme: BeforeMount = (monaco) => {
       'editorLineNumber.activeForeground': '#000000',
       'editor.lineHighlightBackground': '#00000010',
       'editor.selectionBackground': '#00000030',
-      'editorCursor.foreground': '#000000',
+      'editorCursor.foreground': '#00FF66',
       'editorIndentGuide.background1': '#00000020',
     },
   });
@@ -146,8 +147,9 @@ export default function PlayerView({ session }: { session: RoomSession }) {
           </span>
         </div>
 
-        <div className="border-l-2 border-black px-2 flex items-center shrink-0">
+        <div className="border-l-2 border-black px-2 flex items-center gap-1 shrink-0">
           <SoundToggle />
+          <CursorToggle />
         </div>
 
         <div className="hidden sm:flex border-l-2 border-black px-3 items-center font-mono font-bold shrink-0">
@@ -415,6 +417,10 @@ export default function PlayerView({ session }: { session: RoomSession }) {
                 renderLineHighlight: 'line',
                 padding: { top: 10 },
                 automaticLayout: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
+                cursorStyle: 'line',
+                cursorWidth: 2,
               }}
             />
           </div>

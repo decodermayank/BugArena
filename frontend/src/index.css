@@ -23,6 +23,23 @@
 
 :root {
   color-scheme: light;
+  --cursor-accent: #00FF66;
+  --cursor-glow: rgba(0, 255, 102, 0.5);
+}
+
+/* Custom Cursor: Hide native system pointer on precision devices when active */
+@media (pointer: fine) {
+  html.custom-cursor-active,
+  html.custom-cursor-active body,
+  html.custom-cursor-active button,
+  html.custom-cursor-active a,
+  html.custom-cursor-active input,
+  html.custom-cursor-active textarea,
+  html.custom-cursor-active select,
+  html.custom-cursor-active [role="button"],
+  html.custom-cursor-active label {
+    cursor: none !important;
+  }
 }
 
 *,
@@ -78,6 +95,7 @@ button,
 textarea {
   font-family: inherit;
   border-radius: 0;
+  caret-color: var(--cursor-accent);
 }
 
 input:focus,
